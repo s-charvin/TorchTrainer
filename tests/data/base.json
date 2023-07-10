@@ -1,0 +1,49 @@
+{
+    "_base_": [
+        "./base.py"
+    ],
+    "json_item1": {{_base_.py_item1}},
+    "json_item2": {
+        "a": {{ _base_.py_item2.a }}
+    },
+    "json_item3": true,
+    "json_item4": "{{fileDirname}}",
+    "json_item5": {
+        "a": 0,
+        "b": 1
+    },
+    "json_item6": [
+        {
+            "a": 0
+        },
+        {
+            "b": 1
+        }
+    ],
+    "json_item7": {
+        "a": [
+            0,
+            1,
+            2
+        ],
+        "b": {
+            "c": [
+                3.1,
+                4.2,
+                5.3
+            ]
+        }
+    },
+    "json_int": 1,
+    "json_list": [
+        1,
+        2,
+        3
+    ],
+    "json_optimizer": {
+        "type": "SGD",
+        "lr": 0.1,
+        "momentum": 0.9,
+        "weight_decay": 0.0001
+    }
+}

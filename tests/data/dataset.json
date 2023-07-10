@@ -1,0 +1,27 @@
+{
+    "metainfo":
+    {
+      "dataset_type": "test_dataset",
+      "task_name": "test_task",
+      "empty_list": []
+    },
+    "data_list":
+    [
+      {
+        "img_path": "test_img.jpg",
+        "height": 604,
+        "width": 640
+
+      },
+      {
+        "img_path": "gray.jpg",
+        "height": 288,
+        "width": 512
+      },
+      {
+        "img_path": "gray.jpg",
+        "height": 512,
+        "width": 512
+      }
+    ]
+  }
