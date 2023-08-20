@@ -1,7 +1,7 @@
 import copy
 import os.path as osp
-from torchTraining import Config, ConfigDict
-from torchTraining.utils.fileio import dump, load
+from TorchTrainer import Config, ConfigDict
+from TorchTrainer.utils.fileio import dump, load
 
 
 class TestConfig:

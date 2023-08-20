@@ -1,11 +1,11 @@
 import copy
 import torch
-from torchTraining.datasets import (
+from TorchTrainer.datasets import (
     BaseDataset,
     Transform,
 )
-from torchTraining.utils.registry import DATASETS, TRANSFORMS
-from torchTraining.utils.fileio import load
+from TorchTrainer.utils.registry import DATASETS, TRANSFORMS
+from TorchTrainer.utils.fileio import load
 
 
 def function_pipeline(data_info):
@@ -28,11 +28,8 @@ class CustomDataset(BaseDataset):
     def __init__(self, data_root="./data/dataset.json", *arg, **args):
         super().__init__(root=data_root, *arg, **args)
 
-    def load_data_list(self):
+    def load_info(self):
         return load("./data/dataset.json")["data_list"]
-
-    def load_metainfo(self):
-        return load("./data/dataset.json")["metainfo"]
 
 
 class TestBaseDataset:
