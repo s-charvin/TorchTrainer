@@ -1,11 +1,6 @@
 # Customization
-
+work_dir/
 .vscode/
-
-
-
-
-
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
