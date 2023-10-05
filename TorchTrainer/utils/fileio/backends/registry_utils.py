@@ -7,7 +7,6 @@ from .lmdb_backend import LmdbBackend
 from .local_backend import LocalBackend
 from .memcached_backend import MemcachedBackend
 from .petrel_backend import PetrelBackend
-from TorchTrainer.utils.registry import BACKENDS, Registry
 
 backends: dict = {}
 prefix_to_backends: dict = {}

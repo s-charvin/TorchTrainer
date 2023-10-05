@@ -333,8 +333,6 @@ class ResizeImage(BaseTransform):
                     return_scale=True,
                     backend=self.backend,
                 )
-                # the w_scale and h_scale has minor difference
-                # a real fix should be done in the mmcv.imrescale in the future
                 new_h, new_w = results[key].shape[:2]
                 h, w = data.shape[:2]
                 w_scale = new_w / w
@@ -441,8 +439,6 @@ class ResizeVideo(BaseTransform):
                         return_scale=True,
                         backend=self.backend,
                     )
-                    # the w_scale and h_scale has minor difference
-                    # a real fix should be done in the mmcv.imrescale in the future
                     new_h, new_w = img.shape[:2]
                     h, w = data[j].shape[:2]
                     w_scale = new_w / w

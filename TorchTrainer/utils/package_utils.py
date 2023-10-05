@@ -47,10 +47,6 @@ def get_installed_path(package: str) -> str:
 
     from pkg_resources import DistributionNotFound, get_distribution
 
-    # if the package name is not the same as module name, module name should be
-    # inferred. For example, mmcv-full is the package name, but mmcv is module
-    # name. If we want to get the installed path of mmcv-full, we should concat
-    # the pkg.location and module name
     try:
         pkg = get_distribution(package)
     except DistributionNotFound as e:

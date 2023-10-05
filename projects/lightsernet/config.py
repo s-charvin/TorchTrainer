@@ -1,3 +1,5 @@
+import _init_paths
+
 import argparse
 
 import torch
@@ -12,7 +14,7 @@ from TorchTrainer.runner import Runner
 from TorchTrainer.evaluator import BaseMetric
 from TorchTrainer.structures import label_data, ClsDataSample
 
-from .model import LightSerNet
+from model import LightSerNet
 
 
 def parse_args():
