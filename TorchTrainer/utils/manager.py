@@ -20,20 +20,28 @@ def _release_lock() -> None:
         _lock.release()
 
 
-class GlobalManager:
+class ManagerMeta(type):
+    """通过元类, 使得全局类在创建实例之前先创建 _instance_dict 成员;
+    """
+    def __init__(cls, *args):
+        cls._instance_dict = OrderedDict()
+        params = inspect.getfullargspec(cls)
+        params_names = params[0] if params[0] else []
+        assert 'name' in params_names, f'{cls} must have the `name` argument'
+        super().__init__(*args)
+
+
+class GlobalManager(metaclass=ManagerMeta):
     """``GlobalManager`` 具有全局访问要求的类的基类.
     Args:
         name (str): Name of the instance. Defaults to ''.
     """
-
-    _instance_dict = OrderedDict()  # 类属性, 所有实例共享.
 
     def __init__(self, name: str = "", **kwargs):
         assert (
             isinstance(name, str) and name
         ), "name argument must be an non-empty string."
         self._instance_name = name
-        super().__init__()
 
     @classmethod
     def get_instance(cls: Type[T], name: str, **kwargs) -> T:

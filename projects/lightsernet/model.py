@@ -76,7 +76,7 @@ class LightSerNet(BaseModel):
         ), "gt_label must be provided"
 
         targets = torch.stack([i.gt_label.label for i in data_samples]).squeeze(1)
-        mfcc = inputs["mfcc_data"][0]
+        mfcc = inputs["mfcc_data"]
 
         if mfcc.dim() == 3:
             mfcc = mfcc.unsqueeze(1)
