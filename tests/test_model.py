@@ -1,4 +1,4 @@
-# Copyright (c) OpenMMLab. All rights reserved.
+
 import itertools
 import os.path as osp
 import copy
@@ -8,15 +8,15 @@ from torch.optim import SGD
 import torch.nn.functional as F
 from torch.nn.init import constant_
 import tempfile
-from torchTraining.model import (
+from TorchTrainer.model import (
     BaseDataPreprocessor,
     BaseModel,
     ImgDataPreprocessor,
     BaseModule,
 )
-from torchTraining.optim import OptimWrapper
-from torchTraining.structures import InstanceData
-from torchTraining.utils.registry import MODELS, Registry, build_from_cfg
+from TorchTrainer.optim import OptimWrapper
+from TorchTrainer.structures import InstanceData
+from TorchTrainer.utils.registry import MODELS, Registry, build_from_cfg
 from torch.testing import assert_allclose
 
 dtypes_to_test = [torch.float16, torch.float32, torch.float64, torch.half]

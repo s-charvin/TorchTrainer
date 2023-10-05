@@ -3,15 +3,15 @@ from setuptools import find_packages, setup
 
 
 def get_version():
-    with open("torchTraining/version.py") as f:
-        exec(compile(f.read(), "torchTraining/version.py", "exec"))
+    with open("TorchTrainer/version.py") as f:
+        exec(compile(f.read(), "TorchTrainer/version.py", "exec"))
     return locals()["__version__"]
 
 
 setup(
-    name="torchTraining",
+    name="TorchTrainer",
     version=get_version(),
-    description="Engine of torchTraining projects",
+    description="Engine of TorchTrainer projects",
     url="",
     author="",
     author_email="",
@@ -25,6 +25,8 @@ setup(
         "torchvision",
         "matplotlib",
         "lmdb",
+        "addict",
+        "yapf",
     ],
     extras_require={},
 )
