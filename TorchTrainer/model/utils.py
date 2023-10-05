@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from TorchTrainer.utils.logging import print_log
-from TorchTrainer.utils.dl_utils import mmcv_full_available
 
 
 def stack_batch(
@@ -165,7 +164,7 @@ def convert_sync_batchnorm(module: nn.Module, implementation="torch") -> nn.Modu
             SyncBatchNorm = torch.nn.modules.batchnorm.SyncBatchNorm
         else:
             raise ValueError(
-                'sync_bn should be "torch" or "mmcv", but got ' f"{implementation}"
+                'sync_bn should be "torch", but got ' f"{implementation}"
             )
 
         module_output = SyncBatchNorm(

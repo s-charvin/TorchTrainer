@@ -1,24 +1,12 @@
-import warnings
-import inspect
 import logging
-import sys
-import threading
-import copy
-import time
 from collections.abc import Callable
-from contextlib import contextmanager
-from importlib import import_module
-from inspect import getfullargspec, ismodule
-
 from typing import Generator, Optional, Type, TypeVar, Any, Dict, List, Tuple, Union
-import types
-from collections import OrderedDict
 from rich.console import Console
 from rich.table import Table
 
 from TorchTrainer.utils import is_seq_of
 from TorchTrainer.utils.logging import print_log
-from TorchTrainer.config import Config
+
 
 
 class Registry:

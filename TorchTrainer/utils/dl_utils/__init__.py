@@ -2,7 +2,7 @@
 
 from .collect_env import collect_env
 from .hub import load_url
-from .misc import has_batch_norm, is_norm, mmcv_full_available, tensor2imgs
+from .misc import has_batch_norm, is_norm, tensor2imgs
 from .parrots_wrapper import TORCH_VERSION
 from .setup_env import set_multi_processing, setup_cache_size_limit_of_dynamo
 from .time_counter import TimeCounter
@@ -11,6 +11,6 @@ from .trace import is_jit_tracing
 
 __all__ = [
     'load_url', 'TORCH_VERSION', 'set_multi_processing', 'has_batch_norm',
-    'is_norm', 'tensor2imgs', 'mmcv_full_available', 'collect_env',
+    'is_norm', 'tensor2imgs', 'collect_env',
     'torch_meshgrid', 'is_jit_tracing', 'TimeCounter', 'setup_cache_size_limit_of_dynamo'
 ]

@@ -590,8 +590,7 @@ class PetrelBackend(BaseStorageBackend):
     def generate_presigned_url(
         self, url: str, client_method: str = "get_object", expires_in: int = 3600
     ) -> str:
-        """Generate the presigned url of video stream which can be passed to
-        mmcv.VideoReader. Now only work on Petrel backend.
+        """Generate the presigned url of video stream. Now only work on Petrel backend.
 
         Note:
             Now only work on Petrel backend.

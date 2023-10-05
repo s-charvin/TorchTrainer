@@ -234,7 +234,7 @@ def capture_video(in_path, out_path, start_time, end_time, speaker):
 class IEMOCAP(BaseDataset):
     def __init__(self, root, enable_video=False, threads=0, *arg, **args):
         self.enable_video = enable_video
-        self.videomode == "crop"
+        self.videomode = "crop"
         self.threads = threads
         if self.enable_video:
             self.check_video_file()

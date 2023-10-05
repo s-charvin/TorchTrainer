@@ -6,7 +6,7 @@ from TorchTrainer.model import BaseModel
 from TorchTrainer.structures import ClsDataSample
 
 
-from . import components
+import components
 
 
 class LightSerNet(BaseModel):

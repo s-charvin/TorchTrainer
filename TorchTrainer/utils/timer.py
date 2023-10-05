@@ -11,27 +11,6 @@ class TimerError(Exception):
 
 class Timer:
     """A flexible Timer class.
-
-    Examples:
-        >>> import time
-        >>> import mmcv
-        >>> with mmcv.Timer():
-        >>>     # simulate a code block that will run for 1s
-        >>>     time.sleep(1)
-        1.000
-        >>> with mmcv.Timer(print_tmpl='it takes {:.1f} seconds'):
-        >>>     # simulate a code block that will run for 1s
-        >>>     time.sleep(1)
-        it takes 1.0 seconds
-        >>> timer = mmcv.Timer()
-        >>> time.sleep(0.5)
-        >>> print(timer.since_start())
-        0.500
-        >>> time.sleep(0.5)
-        >>> print(timer.since_last_check())
-        0.500
-        >>> print(timer.since_start())
-        1.000
     """
 
     def __init__(self, start=True, print_tmpl=None):
@@ -95,18 +74,6 @@ def check_time(timer_id):
 
     This method is suitable for running a task on a list of items. A timer will
     be registered when the method is called for the first time.
-
-    Examples:
-        >>> import time
-        >>> import mmcv
-        >>> for i in range(1, 6):
-        >>>     # simulate a code block
-        >>>     time.sleep(i)
-        >>>     mmcv.check_time('task1')
-        2.000
-        3.000
-        4.000
-        5.000
 
     Args:
         str: Timer identifier.

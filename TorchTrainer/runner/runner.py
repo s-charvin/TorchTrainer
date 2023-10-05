@@ -522,7 +522,7 @@ class Runner:
                     model = convert_sync_batchnorm(model, sync_bn)
                 except ValueError as e:
                     self.logger.error(
-                        'cfg.sync_bn should be "torch" or ' f'"mmcv", but got {sync_bn}'
+                        'cfg.sync_bn should be "torch"' f', but got {sync_bn}'
                     )
                     raise e
         if model_wrapper_cfg is None:

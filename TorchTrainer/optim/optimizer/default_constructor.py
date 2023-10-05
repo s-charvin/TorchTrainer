@@ -4,6 +4,8 @@ from typing import List, Optional, Union
 import torch
 import torch.nn as nn
 from torch.nn import GroupNorm, LayerNorm
+import torchvision
+from torchvision.ops import DeformConv2d
 
 from TorchTrainer.utils.logging import print_log
 from TorchTrainer.utils.registry import (
@@ -12,7 +14,6 @@ from TorchTrainer.utils.registry import (
     OPTIMIZERS,
 )
 from TorchTrainer.utils import is_list_of
-from TorchTrainer.utils.dl_utils import mmcv_full_available
 from TorchTrainer.utils.dl_utils.parrots_wrapper import _BatchNorm, _InstanceNorm
 from .optimizer_wrapper import OptimWrapper
 
@@ -289,12 +290,10 @@ class DefaultOptimWrapperConstructor:
                     f"paramwise_options -- {full_name}:{key}={value}", logger="current"
                 )
 
-        if mmcv_full_available():
-            from mmcv.ops import DeformConv2d, ModulatedDeformConv2d
+        # DeformConv2d, ModulatedDeformConv2d
+        # is_dcn_module = isinstance(module, (DeformConv2d))
+        is_dcn_module = False
 
-            is_dcn_module = isinstance(module, (DeformConv2d, ModulatedDeformConv2d))
-        else:
-            is_dcn_module = False
         for child_name, child_mod in module.named_children():
             child_prefix = f"{prefix}.{child_name}" if prefix else child_name
             self.add_params(

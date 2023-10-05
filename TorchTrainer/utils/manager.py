@@ -33,7 +33,7 @@ class GlobalManager:
             isinstance(name, str) and name
         ), "name argument must be an non-empty string."
         self._instance_name = name
-        super().__init__(name)
+        super().__init__()
 
     @classmethod
     def get_instance(cls: Type[T], name: str, **kwargs) -> T:
