@@ -8,3 +8,14 @@ Config: 默认配置文件管理工具
 - 支持在配置文件中使用 `{{var}}` 的方式预定义变量, 例如 `fileDirname`、`fileBasename`、`fileBasenameNoExtension`、`fileExtname`. 
 - 支持在配置文件中使用 `{{var:default}}` 的方式使用环境变量, 其中 "default" 是环境变量未找到时的默认值. 
 - 支持将多个配置文件合并为一个配置文件. 
+
+# 开发
+
+```bash
+git add -A .
+git commit -m "update"
+git checkout dev
+git merge --no-ff optimization
+git branch -d optimization
+git push origin dev
+```
