@@ -12,10 +12,11 @@ Config: 默认配置文件管理工具
 # 开发
 
 ```bash
+git checkout -b fea dev
 git add -A .
-git commit -m "update"
+git commit -m "fix"
 git checkout dev
-git merge --no-ff optimization
-git branch -d optimization
+git merge --no-ff fea
+git branch -d fea
 git push origin dev
 ```
