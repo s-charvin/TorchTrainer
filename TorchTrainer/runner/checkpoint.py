@@ -13,7 +13,7 @@ import torch
 
 import TorchTrainer
 from TorchTrainer.utils.dist import get_dist_info
-from TorchTrainer.utils.fileio import FileClient, get_file_backend
+from TorchTrainer.utils.fileio import get_file_backend
 from TorchTrainer.utils.fileio import load as load_file
 from TorchTrainer.utils.logging import print_log
 from TorchTrainer.model import is_model_wrapper
@@ -51,7 +51,9 @@ def _get_TorchTrainer_home():
     TorchTrainer_home = os.path.expanduser(
         os.getenv(
             ENV_TorchTrainer_HOME,
-            os.path.join(os.getenv(ENV_XDG_CACHE_HOME, DEFAULT_CACHE_DIR), "TorchTrainer"),
+            os.path.join(
+                os.getenv(ENV_XDG_CACHE_HOME, DEFAULT_CACHE_DIR), "TorchTrainer"
+            ),
         )
     )
 
@@ -728,38 +730,20 @@ def get_state_dict(module, destination=None, prefix="", keep_vars=False):
     return destination
 
 
-def save_checkpoint(checkpoint, filename, file_client_args=None, backend_args=None):
+def save_checkpoint(checkpoint, filename, backend_args=None):
     """Save checkpoint to file.
 
     Args:
         checkpoint (dict): Module whose params are to be saved.
         filename (str): Checkpoint filename.
-        file_client_args (dict, optional): Arguments to instantiate a
-            FileClient. See :class:`TorchTrainer.utils.FileClient` for details.
-            Defaults to None. It will be deprecated in future. Please use
-            `backend_args` instead.
         backend_args (dict, optional): Arguments to instantiate the
             prefix of uri corresponding backend. Defaults to None.
-            New in v0.2.0.
     """
-    if file_client_args is not None:
-        print_log(
-            '"file_client_args" will be deprecated in future. '
-            'Please use "backend_args" instead',
-            logger="current",
-            level=logging.WARNING,
-        )
-        if backend_args is not None:
-            raise ValueError(
-                '"file_client_args" and "backend_args" cannot be set '
-                "at the same time."
-            )
 
     if filename.startswith("pavi://"):
-        if file_client_args is not None or backend_args is not None:
+        if backend_args is not None:
             raise ValueError(
-                '"file_client_args" or "backend_args" should be "None" if '
-                'filename starts with "pavi://"'
+                '"backend_args" should be "None" if ' 'filename starts with "pavi://"'
             )
         try:
             from pavi import exception, modelcloud
@@ -779,12 +763,7 @@ def save_checkpoint(checkpoint, filename, file_client_args=None, backend_args=No
                 f.flush()
             model.create_file(checkpoint_file, name=model_name)
     else:
-        file_client = FileClient.infer_client(file_client_args, filename)
-        if file_client_args is None:
-            file_backend = get_file_backend(filename, backend_args=backend_args)
-        else:
-            file_backend = file_client
-
+        file_backend = get_file_backend(filename, backend_args=backend_args)
         with io.BytesIO() as f:
             torch.save(checkpoint, f)
             file_backend.put(f.getvalue(), filename)

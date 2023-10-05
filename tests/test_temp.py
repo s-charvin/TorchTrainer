@@ -4,31 +4,7 @@ from typing import Any, Mapping, Sequence, Dict
 
 import numpy as np
 import torch
-from TorchTrainer.utils.registry import FUNCTIONS
-
-
-def worker_init_fn(
-    worker_id: int,
-    num_workers: int,
-    rank: int,
-    seed: int,
-    disable_subprocess_warning: bool = False,
-) -> None:
-    """该函数将在每个工作进程种子和数据加载之后被调用.
-
-    Args:
-        worker_id (int): [0, num_workers-1]中的工作进程ID.
-        num_workers (int): 用于数据加载的子进程数.
-        rank (int): 分布式环境中的进程等级. 如果在非分布式环境中, 则为常量“0”.
-        seed (int): 随机种子.
-    """
-    # 每个 worker 的 seed 等于 num_worker *rank + worker_id + user_seed
-    worker_seed = num_workers * rank + worker_id + seed
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
-    torch.manual_seed(worker_seed)
-    if disable_subprocess_warning and worker_id != 0:
-        warnings.simplefilter("ignore")
+from torch.utils.data._utils.collate import default_collate as torch_default_collate
 
 
 def pseudo_collate(data_batch: Sequence) -> Any:
@@ -122,7 +98,6 @@ def unflatten_dict(d):
     return result
 
 
-@FUNCTIONS.register_module()
 def input_collate(data_batch: Sequence) -> Any:
     data_item = data_batch[0]
     assert "inputs" in data_item
@@ -131,3 +106,51 @@ def input_collate(data_batch: Sequence) -> Any:
     result = unflatten_dict(batch_dict)
 
     return result
+
+
+sample_1 = {
+    "inputs": {"audio_data": torch.randn(1, 10), "mfcc_data": torch.randn(1, 10, 13)},
+    "data_samples": {"label_id": 0, "sample_rate": 10},
+}
+
+
+# 将3个样本堆叠在一起, 创建一个batch大小的Tensor对象
+batch = [
+    {
+        "inputs": {
+            "audio_data": torch.randn(1, 10),
+            "mfcc_data": torch.randn(1, 10, 13),
+            "text_data": [
+                {"text": "hello world", "text_len": 11},
+                {"text": "hello", "text_len": 5},
+            ],
+        },
+        "data_samples": {"label_id": 0, "sample_rate": 10, "audio_path": "test0.wav"},
+    },
+    {
+        "inputs": {
+            "audio_data": torch.randn(1, 10),
+            "mfcc_data": torch.randn(1, 10, 13),
+            "text_data": [
+                {"text": "hello world", "text_len": 11},
+                {"text": "hello", "text_len": 5},
+            ],
+        },
+        "data_samples": {"label_id": 1, "sample_rate": 10, "audio_path": "test1.wav"},
+    },
+    {
+        "inputs": {
+            "audio_data": torch.randn(1, 10),
+            "mfcc_data": torch.randn(1, 10, 13),
+            "text_data": [
+                {"text": "hello world", "text_len": 11},
+                {"text": "hello", "text_len": 5},
+            ],
+        },
+        "data_samples": {"label_id": 2, "sample_rate": 10, "audio_path": "test2.wav"},
+    },
+]
+
+batch = input_collate(batch)
+print(batch)
+pass

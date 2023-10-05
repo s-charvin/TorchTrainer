@@ -1,4 +1,3 @@
-
 import logging
 from typing import List, Optional, Union
 
@@ -7,8 +6,11 @@ import torch.nn as nn
 from torch.nn import GroupNorm, LayerNorm
 
 from TorchTrainer.utils.logging import print_log
-from TorchTrainer.utils.registry import (OPTIM_WRAPPER_CONSTRUCTORS, OPTIM_WRAPPERS,
-                               OPTIMIZERS)
+from TorchTrainer.utils.registry import (
+    OPTIM_WRAPPER_CONSTRUCTORS,
+    OPTIM_WRAPPERS,
+    OPTIMIZERS,
+)
 from TorchTrainer.utils import is_list_of
 from TorchTrainer.utils.dl_utils import mmcv_full_available
 from TorchTrainer.utils.dl_utils.parrots_wrapper import _BatchNorm, _InstanceNorm
@@ -114,60 +116,67 @@ class DefaultOptimWrapperConstructor:
         >>> # model.cls_head is (0.01, 0.95).
     """
 
-    def __init__(self,
-                 optim_wrapper_cfg: dict,
-                 paramwise_cfg: Optional[dict] = None):
+    def __init__(self, optim_wrapper_cfg: dict, paramwise_cfg: Optional[dict] = None):
         if not isinstance(optim_wrapper_cfg, dict):
-            raise TypeError('optimizer_cfg should be a dict',
-                            f'but got {type(optim_wrapper_cfg)}')
-        assert 'optimizer' in optim_wrapper_cfg, (
-            '`optim_wrapper_cfg` must contain "optimizer" config')
+            raise TypeError(
+                "optimizer_cfg should be a dict", f"but got {type(optim_wrapper_cfg)}"
+            )
+        assert (
+            "optimizer" in optim_wrapper_cfg
+        ), '`optim_wrapper_cfg` must contain "optimizer" config'
         self.optim_wrapper_cfg = optim_wrapper_cfg.copy()
-        self.optimizer_cfg = self.optim_wrapper_cfg.pop('optimizer')
+        self.optimizer_cfg = self.optim_wrapper_cfg.pop("optimizer")
         self.paramwise_cfg = {} if paramwise_cfg is None else paramwise_cfg
-        self.base_lr = self.optimizer_cfg.get('lr', None)
-        self.base_wd = self.optimizer_cfg.get('weight_decay', None)
+        self.base_lr = self.optimizer_cfg.get("lr", None)
+        self.base_wd = self.optimizer_cfg.get("weight_decay", None)
         self._validate_cfg()
 
     def _validate_cfg(self) -> None:
         """verify the correctness of the config."""
         if not isinstance(self.paramwise_cfg, dict):
-            raise TypeError('paramwise_cfg should be None or a dict, '
-                            f'but got {type(self.paramwise_cfg)}')
+            raise TypeError(
+                "paramwise_cfg should be None or a dict, "
+                f"but got {type(self.paramwise_cfg)}"
+            )
 
-        if 'custom_keys' in self.paramwise_cfg:
-            if not isinstance(self.paramwise_cfg['custom_keys'], dict):
+        if "custom_keys" in self.paramwise_cfg:
+            if not isinstance(self.paramwise_cfg["custom_keys"], dict):
                 raise TypeError(
-                    'If specified, custom_keys must be a dict, '
-                    f'but got {type(self.paramwise_cfg["custom_keys"])}')
+                    "If specified, custom_keys must be a dict, "
+                    f'but got {type(self.paramwise_cfg["custom_keys"])}'
+                )
             if self.base_wd is None:
-                for key in self.paramwise_cfg['custom_keys']:
-                    if 'decay_mult' in self.paramwise_cfg['custom_keys'][key]:
-                        raise ValueError('base_wd should not be None')
+                for key in self.paramwise_cfg["custom_keys"]:
+                    if "decay_mult" in self.paramwise_cfg["custom_keys"][key]:
+                        raise ValueError("base_wd should not be None")
 
         # get base lr and weight decay
         # weight_decay must be explicitly specified if mult is specified
-        if ('bias_decay_mult' in self.paramwise_cfg
-                or 'norm_decay_mult' in self.paramwise_cfg
-                or 'dwconv_decay_mult' in self.paramwise_cfg):
+        if (
+            "bias_decay_mult" in self.paramwise_cfg
+            or "norm_decay_mult" in self.paramwise_cfg
+            or "dwconv_decay_mult" in self.paramwise_cfg
+        ):
             if self.base_wd is None:
-                raise ValueError('base_wd should not be None')
+                raise ValueError("base_wd should not be None")
 
     def _is_in(self, param_group: dict, param_group_list: list) -> bool:
         """check whether the `param_group` is in the`param_group_list`"""
         assert is_list_of(param_group_list, dict)
-        param = set(param_group['params'])
+        param = set(param_group["params"])
         param_set = set()
         for group in param_group_list:
-            param_set.update(set(group['params']))
+            param_set.update(set(group["params"]))
 
         return not param.isdisjoint(param_set)
 
-    def add_params(self,
-                   params: List[dict],
-                   module: nn.Module,
-                   prefix: str = '',
-                   is_dcn_module: Optional[Union[int, float]] = None) -> None:
+    def add_params(
+        self,
+        params: List[dict],
+        module: nn.Module,
+        prefix: str = "",
+        is_dcn_module: Optional[Union[int, float]] = None,
+    ) -> None:
         """Add all parameters of module to the params list.
 
         The parameters of the given module will be added to the list of param
@@ -183,33 +192,33 @@ class DefaultOptimWrapperConstructor:
                 control conv_offset layer's learning rate. Defaults to None.
         """
         # get param-wise options
-        custom_keys = self.paramwise_cfg.get('custom_keys', {})
+        custom_keys = self.paramwise_cfg.get("custom_keys", {})
         # first sort with alphabet order and then sort with reversed len of str
         sorted_keys = sorted(sorted(custom_keys.keys()), key=len, reverse=True)
 
-        bias_lr_mult = self.paramwise_cfg.get('bias_lr_mult', None)
-        bias_decay_mult = self.paramwise_cfg.get('bias_decay_mult', None)
-        norm_decay_mult = self.paramwise_cfg.get('norm_decay_mult', None)
-        dwconv_decay_mult = self.paramwise_cfg.get('dwconv_decay_mult', None)
-        flat_decay_mult = self.paramwise_cfg.get('flat_decay_mult', None)
-        bypass_duplicate = self.paramwise_cfg.get('bypass_duplicate', False)
-        dcn_offset_lr_mult = self.paramwise_cfg.get('dcn_offset_lr_mult', None)
+        bias_lr_mult = self.paramwise_cfg.get("bias_lr_mult", None)
+        bias_decay_mult = self.paramwise_cfg.get("bias_decay_mult", None)
+        norm_decay_mult = self.paramwise_cfg.get("norm_decay_mult", None)
+        dwconv_decay_mult = self.paramwise_cfg.get("dwconv_decay_mult", None)
+        flat_decay_mult = self.paramwise_cfg.get("flat_decay_mult", None)
+        bypass_duplicate = self.paramwise_cfg.get("bypass_duplicate", False)
+        dcn_offset_lr_mult = self.paramwise_cfg.get("dcn_offset_lr_mult", None)
 
         # special rules for norm layers and depth-wise conv layers
-        is_norm = isinstance(module,
-                             (_BatchNorm, _InstanceNorm, GroupNorm, LayerNorm))
+        is_norm = isinstance(module, (_BatchNorm, _InstanceNorm, GroupNorm, LayerNorm))
         is_dwconv = (
-            isinstance(module, torch.nn.Conv2d)
-            and module.in_channels == module.groups)
+            isinstance(module, torch.nn.Conv2d) and module.in_channels == module.groups
+        )
 
         for name, param in module.named_parameters(recurse=False):
-            param_group = {'params': [param]}
+            param_group = {"params": [param]}
             if bypass_duplicate and self._is_in(param_group, params):
                 print_log(
-                    f'{prefix} is duplicate. It is skipped since '
-                    f'bypass_duplicate={bypass_duplicate}',
-                    logger='current',
-                    level=logging.WARNING)
+                    f"{prefix} is duplicate. It is skipped since "
+                    f"bypass_duplicate={bypass_duplicate}",
+                    logger="current",
+                    level=logging.WARNING,
+                )
                 continue
             if not param.requires_grad:
                 params.append(param_group)
@@ -218,13 +227,13 @@ class DefaultOptimWrapperConstructor:
             # if the parameter match one of the custom keys, ignore other rules
             is_custom = False
             for key in sorted_keys:
-                if key in f'{prefix}.{name}':
+                if key in f"{prefix}.{name}":
                     is_custom = True
-                    lr_mult = custom_keys[key].get('lr_mult', 1.)
-                    param_group['lr'] = self.base_lr * lr_mult
+                    lr_mult = custom_keys[key].get("lr_mult", 1.0)
+                    param_group["lr"] = self.base_lr * lr_mult
                     if self.base_wd is not None:
-                        decay_mult = custom_keys[key].get('decay_mult', 1.)
-                        param_group['weight_decay'] = self.base_wd * decay_mult
+                        decay_mult = custom_keys[key].get("decay_mult", 1.0)
+                        param_group["weight_decay"] = self.base_wd * decay_mult
                     # add custom settings to param_group
                     for k, v in custom_keys[key].items():
                         param_group[k] = v
@@ -233,76 +242,83 @@ class DefaultOptimWrapperConstructor:
             if not is_custom:
                 # bias_lr_mult affects all bias parameters
                 # except for norm.bias dcn.conv_offset.bias
-                if name == 'bias' and not (
-                        is_norm or is_dcn_module) and bias_lr_mult is not None:
-                    param_group['lr'] = self.base_lr * bias_lr_mult
+                if (
+                    name == "bias"
+                    and not (is_norm or is_dcn_module)
+                    and bias_lr_mult is not None
+                ):
+                    param_group["lr"] = self.base_lr * bias_lr_mult
 
-                if (prefix.find('conv_offset') != -1 and is_dcn_module
-                        and dcn_offset_lr_mult is not None
-                        and isinstance(module, torch.nn.Conv2d)):
+                if (
+                    prefix.find("conv_offset") != -1
+                    and is_dcn_module
+                    and dcn_offset_lr_mult is not None
+                    and isinstance(module, torch.nn.Conv2d)
+                ):
                     # deal with both dcn_offset's bias & weight
-                    param_group['lr'] = self.base_lr * dcn_offset_lr_mult
+                    param_group["lr"] = self.base_lr * dcn_offset_lr_mult
 
                 # apply weight decay policies
                 if self.base_wd is not None:
                     # norm decay
                     if is_norm and norm_decay_mult is not None:
-                        param_group[
-                            'weight_decay'] = self.base_wd * norm_decay_mult
+                        param_group["weight_decay"] = self.base_wd * norm_decay_mult
                     # bias lr and decay
-                    elif (name == 'bias' and not is_dcn_module
-                          and bias_decay_mult is not None):
-                        param_group[
-                            'weight_decay'] = self.base_wd * bias_decay_mult
+                    elif (
+                        name == "bias"
+                        and not is_dcn_module
+                        and bias_decay_mult is not None
+                    ):
+                        param_group["weight_decay"] = self.base_wd * bias_decay_mult
                     # depth-wise conv
                     elif is_dwconv and dwconv_decay_mult is not None:
-                        param_group[
-                            'weight_decay'] = self.base_wd * dwconv_decay_mult
+                        param_group["weight_decay"] = self.base_wd * dwconv_decay_mult
                     # flatten parameters except dcn offset
-                    elif (param.ndim == 1 and not is_dcn_module
-                          and flat_decay_mult is not None):
-                        param_group[
-                            'weight_decay'] = self.base_wd * flat_decay_mult
+                    elif (
+                        param.ndim == 1
+                        and not is_dcn_module
+                        and flat_decay_mult is not None
+                    ):
+                        param_group["weight_decay"] = self.base_wd * flat_decay_mult
             params.append(param_group)
             for key, value in param_group.items():
-                if key == 'params':
+                if key == "params":
                     continue
-                full_name = f'{prefix}.{name}' if prefix else name
+                full_name = f"{prefix}.{name}" if prefix else name
                 print_log(
-                    f'paramwise_options -- {full_name}:{key}={value}',
-                    logger='current')
+                    f"paramwise_options -- {full_name}:{key}={value}", logger="current"
+                )
 
         if mmcv_full_available():
             from mmcv.ops import DeformConv2d, ModulatedDeformConv2d
-            is_dcn_module = isinstance(module,
-                                       (DeformConv2d, ModulatedDeformConv2d))
+
+            is_dcn_module = isinstance(module, (DeformConv2d, ModulatedDeformConv2d))
         else:
             is_dcn_module = False
         for child_name, child_mod in module.named_children():
-            child_prefix = f'{prefix}.{child_name}' if prefix else child_name
+            child_prefix = f"{prefix}.{child_name}" if prefix else child_name
             self.add_params(
-                params,
-                child_mod,
-                prefix=child_prefix,
-                is_dcn_module=is_dcn_module)
+                params, child_mod, prefix=child_prefix, is_dcn_module=is_dcn_module
+            )
 
     def __call__(self, model: nn.Module) -> OptimWrapper:
-        if hasattr(model, 'module'):
+        if hasattr(model, "module"):
             model = model.module
 
         optim_wrapper_cfg = self.optim_wrapper_cfg.copy()
-        optim_wrapper_cfg.setdefault('type', 'OptimWrapper')
+        optim_wrapper_cfg.setdefault("type", "OptimWrapper")
         optimizer_cfg = self.optimizer_cfg.copy()
         # if no paramwise option is specified, just use the global setting
         if not self.paramwise_cfg:
-            optimizer_cfg['params'] = model.parameters()
+            optimizer_cfg["params"] = model.parameters()
             optimizer = OPTIMIZERS.build(optimizer_cfg)
         else:
             # set param-wise lr and weight decay recursively
             params: List = []
             self.add_params(params, model)
-            optimizer_cfg['params'] = params
+            optimizer_cfg["params"] = params
             optimizer = OPTIMIZERS.build(optimizer_cfg)
         optim_wrapper = OPTIM_WRAPPERS.build(
-            optim_wrapper_cfg, default_args=dict(optimizer=optimizer))
+            optim_wrapper_cfg, default_args=dict(optimizer=optimizer)
+        )
         return optim_wrapper

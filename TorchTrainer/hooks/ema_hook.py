@@ -1,4 +1,3 @@
-
 import copy
 import itertools
 import logging
@@ -37,24 +36,29 @@ class EMAHook(Hook):
             :obj:`BaseAveragedModel`
     """
 
-    priority = 'NORMAL'
+    priority = "NORMAL"
 
-    def __init__(self,
-                 ema_type: str = 'ExponentialMovingAverage',
-                 strict_load: bool = False,
-                 begin_iter: int = 0,
-                 begin_epoch: int = 0,
-                 **kwargs):
+    def __init__(
+        self,
+        ema_type: str = "ExponentialMovingAverage",
+        strict_load: bool = False,
+        begin_iter: int = 0,
+        begin_epoch: int = 0,
+        **kwargs,
+    ):
         self.strict_load = strict_load
         self.ema_cfg = dict(type=ema_type, **kwargs)
-        assert not (begin_iter != 0 and begin_epoch != 0), (
-            '`begin_iter` and `begin_epoch` should not be both set.')
+        assert not (
+            begin_iter != 0 and begin_epoch != 0
+        ), "`begin_iter` and `begin_epoch` should not be both set."
         assert begin_iter >= 0, (
-            '`begin_iter` must larger than or equal to 0, '
-            f'but got begin_iter: {begin_iter}')
+            "`begin_iter` must larger than or equal to 0, "
+            f"but got begin_iter: {begin_iter}"
+        )
         assert begin_epoch >= 0, (
-            '`begin_epoch` must larger than or equal to 0, '
-            f'but got begin_epoch: {begin_epoch}')
+            "`begin_epoch` must larger than or equal to 0, "
+            f"but got begin_epoch: {begin_epoch}"
+        )
         self.begin_iter = begin_iter
         self.begin_epoch = begin_epoch
         # If `begin_epoch` and `begin_iter` are not set, `EMAHook` will be
@@ -72,7 +76,8 @@ class EMAHook(Hook):
             model = model.module
         self.src_model = model
         self.ema_model = MODELS.build(
-            self.ema_cfg, default_args=dict(model=self.src_model))
+            self.ema_cfg, default_args=dict(model=self.src_model)
+        )
 
     def before_train(self, runner) -> None:
         """Check the begin_epoch/iter is smaller than max_epochs/iters.
@@ -82,20 +87,24 @@ class EMAHook(Hook):
         """
         if self.enabled_by_epoch:
             assert self.begin_epoch <= runner.max_epochs, (
-                'self.begin_epoch should be smaller than or equal to '
-                f'runner.max_epochs: {runner.max_epochs}, but got '
-                f'begin_epoch: {self.begin_epoch}')
+                "self.begin_epoch should be smaller than or equal to "
+                f"runner.max_epochs: {runner.max_epochs}, but got "
+                f"begin_epoch: {self.begin_epoch}"
+            )
         else:
             assert self.begin_iter <= runner.max_iters, (
-                'self.begin_iter should be smaller than or equal to '
-                f'runner.max_iters: {runner.max_iters}, but got '
-                f'begin_iter: {self.begin_iter}')
+                "self.begin_iter should be smaller than or equal to "
+                f"runner.max_iters: {runner.max_iters}, but got "
+                f"begin_iter: {self.begin_iter}"
+            )
 
-    def after_train_iter(self,
-                         runner,
-                         batch_idx: int,
-                         data_batch: DATA_BATCH = None,
-                         outputs: Optional[dict] = None) -> None:
+    def after_train_iter(
+        self,
+        runner,
+        batch_idx: int,
+        data_batch: DATA_BATCH = None,
+        outputs: Optional[dict] = None,
+    ) -> None:
         """Update ema parameter.
 
         Args:
@@ -122,9 +131,9 @@ class EMAHook(Hook):
         """
         self._swap_ema_parameters()
 
-    def after_val_epoch(self,
-                        runner,
-                        metrics: Optional[Dict[str, float]] = None) -> None:
+    def after_val_epoch(
+        self, runner, metrics: Optional[Dict[str, float]] = None
+    ) -> None:
         """We recover source model's parameter from ema model after validation.
 
         Args:
@@ -143,9 +152,9 @@ class EMAHook(Hook):
         """
         self._swap_ema_parameters()
 
-    def after_test_epoch(self,
-                         runner,
-                         metrics: Optional[Dict[str, float]] = None) -> None:
+    def after_test_epoch(
+        self, runner, metrics: Optional[Dict[str, float]] = None
+    ) -> None:
         """We recover source model's parameter from ema model after test.
 
         Args:
@@ -162,7 +171,7 @@ class EMAHook(Hook):
         Args:
             runner (Runner): The runner of the testing process.
         """
-        checkpoint['ema_state_dict'] = self.ema_model.state_dict()
+        checkpoint["ema_state_dict"] = self.ema_model.state_dict()
         # Save ema parameters to the source model's state dict so that we
         # can directly load the averaged model weights for deployment.
         # Swapping the state_dict key-values instead of swapping model
@@ -177,36 +186,45 @@ class EMAHook(Hook):
             runner (Runner): The runner of the testing process.
         """
         from TorchTrainer.runner.checkpoint import load_state_dict
-        if 'ema_state_dict' in checkpoint and runner._resume:
+
+        if "ema_state_dict" in checkpoint and runner._resume:
             # The original model parameters are actually saved in ema
             # field swap the weights back to resume ema state.
             self._swap_ema_state_dict(checkpoint)
             self.ema_model.load_state_dict(
-                checkpoint['ema_state_dict'], strict=self.strict_load)
+                checkpoint["ema_state_dict"], strict=self.strict_load
+            )
 
         # Support load checkpoint without ema state dict.
         else:
             if runner._resume:
                 print_log(
-                    'There is no `ema_state_dict` in checkpoint. '
-                    '`EMAHook` will make a copy of `state_dict` as the '
-                    'initial `ema_state_dict`', 'current', logging.WARNING)
+                    "There is no `ema_state_dict` in checkpoint. "
+                    "`EMAHook` will make a copy of `state_dict` as the "
+                    "initial `ema_state_dict`",
+                    "current",
+                    logging.WARNING,
+                )
             load_state_dict(
                 self.ema_model.module,
-                copy.deepcopy(checkpoint['state_dict']),
-                strict=self.strict_load)
+                copy.deepcopy(checkpoint["state_dict"]),
+                strict=self.strict_load,
+            )
 
     def _swap_ema_parameters(self) -> None:
         """Swap the parameter of model with ema_model."""
         avg_param = (
-            itertools.chain(self.ema_model.module.parameters(),
-                            self.ema_model.module.buffers())
-            if self.ema_model.update_buffers else
-            self.ema_model.module.parameters())
+            itertools.chain(
+                self.ema_model.module.parameters(), self.ema_model.module.buffers()
+            )
+            if self.ema_model.update_buffers
+            else self.ema_model.module.parameters()
+        )
         src_param = (
-            itertools.chain(self.src_model.parameters(),
-                            self.src_model.buffers())
-            if self.ema_model.update_buffers else self.src_model.parameters())
+            itertools.chain(self.src_model.parameters(), self.src_model.buffers())
+            if self.ema_model.update_buffers
+            else self.src_model.parameters()
+        )
         for p_avg, p_src in zip(avg_param, src_param):
             tmp = p_avg.data.clone()
             p_avg.data.copy_(p_src.data)
@@ -214,10 +232,10 @@ class EMAHook(Hook):
 
     def _swap_ema_state_dict(self, checkpoint):
         """Swap the state dict values of model with ema_model."""
-        model_state = checkpoint['state_dict']
-        ema_state = checkpoint['ema_state_dict']
+        model_state = checkpoint["state_dict"]
+        ema_state = checkpoint["ema_state_dict"]
         for k in ema_state:
-            if k[:7] == 'module.':
+            if k[:7] == "module.":
                 tmp = ema_state[k]
                 ema_state[k] = model_state[k[7:]]
                 model_state[k[7:]] = tmp

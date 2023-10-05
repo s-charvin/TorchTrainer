@@ -1,4 +1,3 @@
-
 from abc import ABCMeta, abstractmethod
 from typing import Any, Dict, Union
 
@@ -6,25 +5,16 @@ from torch.utils.data import DataLoader
 
 
 class BaseLoop(metaclass=ABCMeta):
-    """Base loop class.
-
-    All subclasses inherited from ``BaseLoop`` should overwrite the
-    :meth:`run` method.
-
-    Args:
-        runner (Runner): A reference of runner.
-        dataloader (Dataloader or dict): An iterator to generate one batch of
-            dataset each iteration.
-    """
+    """基本训练循环类,  子类需要实现 run 方法"""
 
     def __init__(self, runner, dataloader: Union[DataLoader, Dict]) -> None:
         self._runner = runner
         if isinstance(dataloader, dict):
             # Determine whether or not different ranks use different seed.
-            diff_rank_seed = runner._randomness_cfg.get(
-                'diff_rank_seed', False)
+            diff_rank_seed = runner._randomness_cfg.get("diff_rank_seed", False)
             self.dataloader = runner.build_dataloader(
-                dataloader, seed=runner.seed, diff_rank_seed=diff_rank_seed)
+                dataloader, seed=runner.seed, diff_rank_seed=diff_rank_seed
+            )
         else:
             self.dataloader = dataloader
 

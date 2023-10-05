@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from typing import Union
 
@@ -18,17 +17,18 @@ class MemcachedBackend(BaseStorageBackend):
     def __init__(self, server_list_cfg, client_cfg, sys_path=None):
         if sys_path is not None:
             import sys
+
             sys.path.append(sys_path)
         try:
             import mc
         except ImportError:
-            raise ImportError(
-                'Please install memcached to enable MemcachedBackend.')
+            raise ImportError("Please install memcached to enable MemcachedBackend.")
 
         self.server_list_cfg = server_list_cfg
         self.client_cfg = client_cfg
-        self._client = mc.MemcachedClient.GetInstance(self.server_list_cfg,
-                                                      self.client_cfg)
+        self._client = mc.MemcachedClient.GetInstance(
+            self.server_list_cfg, self.client_cfg
+        )
         # mc.pyvector servers as a point which points to a memory cache
         self._mc_buffer = mc.pyvector()
 
@@ -40,16 +40,10 @@ class MemcachedBackend(BaseStorageBackend):
 
         Returns:
             bytes: Expected bytes object.
-
-        Examples:
-            >>> server_list_cfg = '/path/of/server_list.conf'
-            >>> client_cfg = '/path/of/mc.conf'
-            >>> backend = MemcachedBackend(server_list_cfg, client_cfg)
-            >>> backend.get('/path/of/file')
-            b'hello world'
         """
         filepath = str(filepath)
         import mc
+
         self._client.Get(filepath, self._mc_buffer)
         value_buf = mc.ConvertBuffer(self._mc_buffer)
         return value_buf

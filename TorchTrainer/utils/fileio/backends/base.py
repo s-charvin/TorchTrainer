@@ -1,4 +1,3 @@
-
 import logging
 from abc import ABCMeta, abstractmethod
 
@@ -6,13 +5,8 @@ from TorchTrainer.utils.logging import print_log
 
 
 class BaseStorageBackend(metaclass=ABCMeta):
-    """Abstract class of storage backends.
-
-    All backends need to implement two apis: :meth:`get()` and
-    :meth:`get_text()`.
-
-    - :meth:`get()` reads the file as a byte stream.
-    - :meth:`get_text()` reads the file as texts.
+    """一个抽象类, 用于定义存储后端的接口.
+    所有的后端都需要实现两个接口: :meth:`get()` 和 :meth:`get_text()`.
     """
 
     # a flag to indicate whether the backend can create a symlink for a file
@@ -22,9 +16,10 @@ class BaseStorageBackend(metaclass=ABCMeta):
     @property
     def allow_symlink(self):
         print_log(
-            'allow_symlink will be deprecated in future',
-            logger='current',
-            level=logging.WARNING)
+            "allow_symlink will be deprecated in future",
+            logger="current",
+            level=logging.WARNING,
+        )
         return self._allow_symlink
 
     @property

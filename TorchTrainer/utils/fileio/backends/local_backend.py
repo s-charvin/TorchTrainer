@@ -1,4 +1,3 @@
-
 import os
 import os.path as osp
 import shutil
@@ -23,20 +22,12 @@ class LocalBackend(BaseStorageBackend):
 
         Returns:
             bytes: Expected bytes object.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/file'
-            >>> backend.get(filepath)
-            b'hello world'
         """
-        with open(filepath, 'rb') as f:
+        with open(filepath, "rb") as f:
             value = f.read()
         return value
 
-    def get_text(self,
-                 filepath: Union[str, Path],
-                 encoding: str = 'utf-8') -> str:
+    def get_text(self, filepath: Union[str, Path], encoding: str = "utf-8") -> str:
         """Read text from a given ``filepath`` with 'r' mode.
 
         Args:
@@ -46,12 +37,6 @@ class LocalBackend(BaseStorageBackend):
 
         Returns:
             str: Expected text reading from ``filepath``.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/file'
-            >>> backend.get_text(filepath)
-            'hello world'
         """
         with open(filepath, encoding=encoding) as f:
             text = f.read()
@@ -67,20 +52,14 @@ class LocalBackend(BaseStorageBackend):
         Args:
             obj (bytes): Data to be written.
             filepath (str or Path): Path to write data.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/file'
-            >>> backend.put(b'hello world', filepath)
         """
         TorchTrainer.mkdir_or_exist(osp.dirname(filepath))
-        with open(filepath, 'wb') as f:
+        with open(filepath, "wb") as f:
             f.write(obj)
 
-    def put_text(self,
-                 obj: str,
-                 filepath: Union[str, Path],
-                 encoding: str = 'utf-8') -> None:
+    def put_text(
+        self, obj: str, filepath: Union[str, Path], encoding: str = "utf-8"
+    ) -> None:
         """Write text to a given ``filepath`` with 'w' mode.
 
         Note:
@@ -92,14 +71,9 @@ class LocalBackend(BaseStorageBackend):
             filepath (str or Path): Path to write data.
             encoding (str): The encoding format used to open the ``filepath``.
                 Defaults to 'utf-8'.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/file'
-            >>> backend.put_text('hello world', filepath)
         """
         TorchTrainer.mkdir_or_exist(osp.dirname(filepath))
-        with open(filepath, 'w', encoding=encoding) as f:
+        with open(filepath, "w", encoding=encoding) as f:
             f.write(obj)
 
     def exists(self, filepath: Union[str, Path]) -> bool:
@@ -110,12 +84,6 @@ class LocalBackend(BaseStorageBackend):
 
         Returns:
             bool: Return ``True`` if ``filepath`` exists, ``False`` otherwise.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/file'
-            >>> backend.exists(filepath)
-            True
         """
         return osp.exists(filepath)
 
@@ -129,12 +97,6 @@ class LocalBackend(BaseStorageBackend):
         Returns:
             bool: Return ``True`` if ``filepath`` points to a directory,
             ``False`` otherwise.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/dir'
-            >>> backend.isdir(filepath)
-            True
         """
         return osp.isdir(filepath)
 
@@ -147,17 +109,12 @@ class LocalBackend(BaseStorageBackend):
         Returns:
             bool: Return ``True`` if ``filepath`` points to a file, ``False``
             otherwise.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/file'
-            >>> backend.isfile(filepath)
-            True
         """
         return osp.isfile(filepath)
 
-    def join_path(self, filepath: Union[str, Path],
-                  *filepaths: Union[str, Path]) -> str:
+    def join_path(
+        self, filepath: Union[str, Path], *filepaths: Union[str, Path]
+    ) -> str:
         r"""Concatenate all file paths.
 
         Join one or more filepath components intelligently. The return value
@@ -168,14 +125,6 @@ class LocalBackend(BaseStorageBackend):
 
         Returns:
             str: The result of concatenation.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath1 = '/path/of/dir1'
-            >>> filepath2 = 'dir2'
-            >>> filepath3 = 'path/of/file'
-            >>> backend.join_path(filepath1, filepath2, filepath3)
-            '/path/of/dir/dir2/path/of/file'
         """
         # TODO, if filepath or filepaths are Path, should return Path
         return osp.join(filepath, *filepaths)
@@ -191,11 +140,6 @@ class LocalBackend(BaseStorageBackend):
             filepath (str or Path): Path to be read data.
             backend_args (dict, optional): Arguments to instantiate the
                 corresponding backend. Defaults to None.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> with backend.get_local_path('s3://bucket/abc.jpg') as path:
-            ...     # do something here
         """
         yield filepath
 
@@ -220,21 +164,6 @@ class LocalBackend(BaseStorageBackend):
         Raises:
             SameFileError: If src and dst are the same file, a SameFileError
                 will be raised.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> # dst is a file
-            >>> src = '/path/of/file'
-            >>> dst = '/path1/of/file1'
-            >>> # src will be copied to '/path1/of/file1'
-            >>> backend.copyfile(src, dst)
-            '/path1/of/file1'
-
-            >>> # dst is a directory
-            >>> dst = '/path1/of/dir'
-            >>> # src will be copied to '/path1/of/dir/file'
-            >>> backend.copyfile(src, dst)
-            '/path1/of/dir/file'
         """
         return shutil.copy(src, dst)
 
@@ -260,13 +189,6 @@ class LocalBackend(BaseStorageBackend):
         Raises:
             FileExistsError: If dst had already existed, a FileExistsError will
                 be raised.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> src = '/path/of/dir1'
-            >>> dst = '/path/of/dir2'
-            >>> backend.copytree(src, dst)
-            '/path/of/dir2'
         """
         return shutil.copytree(src, dst)
 
@@ -289,21 +211,6 @@ class LocalBackend(BaseStorageBackend):
         Raises:
             SameFileError: If src and dst are the same file, a SameFileError
                 will be raised.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> # dst is a file
-            >>> src = '/path/of/file'
-            >>> dst = '/path1/of/file1'
-            >>> # src will be copied to '/path1/of/file1'
-            >>> backend.copyfile_from_local(src, dst)
-            '/path1/of/file1'
-
-            >>> # dst is a directory
-            >>> dst = '/path1/of/dir'
-            >>> # src will be copied to
-            >>> backend.copyfile_from_local(src, dst)
-            '/path1/of/dir/file'
         """
         return self.copyfile(src, dst)
 
@@ -322,13 +229,6 @@ class LocalBackend(BaseStorageBackend):
 
         Returns:
             str: The destination directory.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> src = '/path/of/dir1'
-            >>> dst = '/path/of/dir2'
-            >>> backend.copytree_from_local(src, dst)
-            '/path/of/dir2'
         """
         return self.copytree(src, dst)
 
@@ -351,21 +251,6 @@ class LocalBackend(BaseStorageBackend):
         Returns:
             str: If dst specifies a directory, the file will be copied into dst
             using the base filename from src.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> # dst is a file
-            >>> src = '/path/of/file'
-            >>> dst = '/path1/of/file1'
-            >>> # src will be copied to '/path1/of/file1'
-            >>> backend.copyfile_to_local(src, dst)
-            '/path1/of/file1'
-
-            >>> # dst is a directory
-            >>> dst = '/path1/of/dir'
-            >>> # src will be copied to
-            >>> backend.copyfile_to_local(src, dst)
-            '/path1/of/dir/file'
         """
         return self.copyfile(src, dst)
 
@@ -385,13 +270,6 @@ class LocalBackend(BaseStorageBackend):
 
         Returns:
             str: The destination directory.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> src = '/path/of/dir1'
-            >>> dst = '/path/of/dir2'
-            >>> backend.copytree_from_local(src, dst)
-            '/path/of/dir2'
         """
         return self.copytree(src, dst)
 
@@ -406,17 +284,12 @@ class LocalBackend(BaseStorageBackend):
                 will be raised.
             FileNotFoundError: If filepath does not exist, an FileNotFoundError
                 will be raised.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> filepath = '/path/of/file'
-            >>> backend.remove(filepath)
         """
         if not self.exists(filepath):
-            raise FileNotFoundError(f'filepath {filepath} does not exist')
+            raise FileNotFoundError(f"filepath {filepath} does not exist")
 
         if self.isdir(filepath):
-            raise IsADirectoryError('filepath should be a file')
+            raise IsADirectoryError("filepath should be a file")
 
         os.remove(filepath)
 
@@ -425,10 +298,6 @@ class LocalBackend(BaseStorageBackend):
 
         Args:
             dir_path (str or Path): A directory to be removed.
-
-        Examples:
-            >>> dir_path = '/path/of/dir'
-            >>> backend.rmtree(dir_path)
         """
         shutil.rmtree(dir_path)
 
@@ -449,17 +318,6 @@ class LocalBackend(BaseStorageBackend):
         Returns:
             bool: Return True if successfully create a symbolic link pointing
             to src. Otherwise, return False.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> src = '/path/of/file'
-            >>> dst = '/path1/of/file1'
-            >>> backend.copy_if_symlink_fails(src, dst)
-            True
-            >>> src = '/path/of/dir'
-            >>> dst = '/path1/of/dir1'
-            >>> backend.copy_if_symlink_fails(src, dst)
-            True
         """
         try:
             os.symlink(src, dst)
@@ -471,12 +329,14 @@ class LocalBackend(BaseStorageBackend):
                 self.copytree(src, dst)
             return False
 
-    def list_dir_or_file(self,
-                         dir_path: Union[str, Path],
-                         list_dir: bool = True,
-                         list_file: bool = True,
-                         suffix: Optional[Union[str, Tuple[str]]] = None,
-                         recursive: bool = False) -> Iterator[str]:
+    def list_dir_or_file(
+        self,
+        dir_path: Union[str, Path],
+        list_dir: bool = True,
+        list_file: bool = True,
+        suffix: Optional[Union[str, Tuple[str]]] = None,
+        recursive: bool = False,
+    ) -> Iterator[str]:
         """Scan a directory to find the interested directories or files in
         arbitrary order.
 
@@ -494,50 +354,28 @@ class LocalBackend(BaseStorageBackend):
 
         Yields:
             Iterable[str]: A relative path to ``dir_path``.
-
-        Examples:
-            >>> backend = LocalBackend()
-            >>> dir_path = '/path/of/dir'
-            >>> # list those files and directories in current directory
-            >>> for file_path in backend.list_dir_or_file(dir_path):
-            ...     print(file_path)
-            >>> # only list files
-            >>> for file_path in backend.list_dir_or_file(dir_path, list_dir=False):
-            ...     print(file_path)
-            >>> # only list directories
-            >>> for file_path in backend.list_dir_or_file(dir_path, list_file=False):
-            ...     print(file_path)
-            >>> # only list files ending with specified suffixes
-            >>> for file_path in backend.list_dir_or_file(dir_path, suffix='.txt'):
-            ...     print(file_path)
-            >>> # list all files and directory recursively
-            >>> for file_path in backend.list_dir_or_file(dir_path, recursive=True):
-            ...     print(file_path)
         """
         if list_dir and suffix is not None:
-            raise TypeError('`suffix` should be None when `list_dir` is True')
+            raise TypeError("`suffix` should be None when `list_dir` is True")
 
         if (suffix is not None) and not isinstance(suffix, (str, tuple)):
-            raise TypeError('`suffix` must be a string or tuple of strings')
+            raise TypeError("`suffix` must be a string or tuple of strings")
 
         root = dir_path
 
-        def _list_dir_or_file(dir_path, list_dir, list_file, suffix,
-                              recursive):
+        def _list_dir_or_file(dir_path, list_dir, list_file, suffix, recursive):
             for entry in os.scandir(dir_path):
-                if not entry.name.startswith('.') and entry.is_file():
+                if not entry.name.startswith(".") and entry.is_file():
                     rel_path = osp.relpath(entry.path, root)
-                    if (suffix is None
-                            or rel_path.endswith(suffix)) and list_file:
+                    if (suffix is None or rel_path.endswith(suffix)) and list_file:
                         yield rel_path
                 elif osp.isdir(entry.path):
                     if list_dir:
                         rel_dir = osp.relpath(entry.path, root)
                         yield rel_dir
                     if recursive:
-                        yield from _list_dir_or_file(entry.path, list_dir,
-                                                     list_file, suffix,
-                                                     recursive)
+                        yield from _list_dir_or_file(
+                            entry.path, list_dir, list_file, suffix, recursive
+                        )
 
-        return _list_dir_or_file(dir_path, list_dir, list_file, suffix,
-                                 recursive)
+        return _list_dir_or_file(dir_path, list_dir, list_file, suffix, recursive)

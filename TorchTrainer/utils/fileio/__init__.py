@@ -7,7 +7,7 @@ from .backends import (
     PetrelBackend,
     register_backend,
 )
-from .file_client import FileClient, HardDiskBackend
+
 from .handlers import (
     BaseFileHandler,
     JsonHandler,
@@ -44,11 +44,10 @@ from .parse import dict_from_file, list_from_file
 
 __all__ = [
     "BaseStorageBackend",
-    "FileClient",
     "PetrelBackend",
     "MemcachedBackend",
     "LmdbBackend",
-    "HardDiskBackend",
+
     "LocalBackend",
     "HTTPBackend",
     "copy_if_symlink_fails",

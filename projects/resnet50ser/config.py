@@ -5,12 +5,9 @@ from torch.optim import SGD
 import torch.nn.functional as F
 import torchvision
 
-
-from TorchTrainer.utils.registry import DATASETS
 from TorchTrainer.model import BaseModel
 from TorchTrainer.runner import Runner
-from TorchTrainer.evaluator import BaseMetric
-from TorchTrainer.structures import label_data, ClsDataSample
+from TorchTrainer.structures import  ClsDataSample
 
 
 class ResNet50(BaseModel):
@@ -36,7 +33,7 @@ class ResNet50(BaseModel):
         ), "gt_label must be provided"
 
         targets = torch.stack([i.gt_label.label for i in data_samples]).squeeze(1)
-        mfcc = inputs["mfcc_data"]
+        mfcc = inputs["mfcc_data"][0]
 
         if mfcc.dim() == 3:
             mfcc = mfcc.unsqueeze(1)
@@ -77,13 +74,24 @@ def parse_args():
 def main():
     args = parse_args()
     dataset = dict(
-        type="EMODB",
-        # root="/sdb/visitors2/SCW/data/EMODB",
-        root="E:/mypack/AppPackage/DeepLearning/torchTraining/data/EMODB",
+        type="IEMOCAP4C",
+        root="/sdb/visitors2/SCW/data/IEMOCAP",
+        enable_video=False,
+        threads=0,
         filter=dict(
-            # replace=dict(label=("bored", "sad")),
-            # dropna=["fearful"],
-            # query="gender == 1",
+            replace=dict(
+                label=("excited", "happy"),
+            ),
+            drop=dict(
+                label=[
+                    "other",
+                    "xxx",
+                    "frustrated",
+                    "disgusted",
+                    "fearful",
+                    "surprised",
+                ],
+            ),
         ),
         transforms=[
             dict(
@@ -134,24 +142,6 @@ def main():
                 normalized=True,
                 onesided=True,
             ),
-            dict(
-                type="MelSpectrogram",
-                keys=["audio_data"],
-                override=False,
-                backend="librosa",
-                n_fft=1024,
-                win_length=1024,
-                hop_length=256,
-                f_min=80.0,
-                f_max=7600.0,
-                pad=0,
-                n_mels=128,
-                power=2.0,
-                normalized=True,
-                center=True,
-                pad_mode="reflect",
-                onesided=True,
-            ),
             dict(type="PackAudioClsInputs", keys=["mfcc_data"]),
         ],
     )
@@ -175,15 +165,10 @@ def main():
         ),
     )
 
-    # train_cfg = dict(
-    #     type="IterBasedTrainLoop",
-    #     max_iters=10000,
-    #     val_interval=100,
-    # )
     train_cfg = dict(
-        type="EpochBasedTrainLoop",
-        max_epochs=200,
-        val_interval=1,
+        type="IterBasedTrainLoop",
+        max_iters=10000,
+        val_interval=100,
     )
     # dict(by_epoch=True, max_epochs=2, val_interval=1)
 
@@ -204,7 +189,6 @@ def main():
     )
     log_processor = dict(type="LogProcessor", window_size=50, by_epoch=False)
     auto_scale_lr = dict(base_batch_size=64)
-
     runner = Runner(
         model=model,
         work_dir="./work_dir",

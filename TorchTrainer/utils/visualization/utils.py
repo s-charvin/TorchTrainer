@@ -1,5 +1,3 @@
-
-
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union
 
 import cv2
@@ -11,24 +9,16 @@ if TYPE_CHECKING:
 
 
 def tensor2ndarray(value: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
-    """If the type of value is torch.Tensor, convert the value to np.ndarray.
-
-    Args:
-        value (np.ndarray, torch.Tensor): value.
-
-    Returns:
-        Any: value.
-    """
+    """将 `Torch.Tensor` 类型的数据转换为 `np.ndarray` 类型."""
     if isinstance(value, torch.Tensor):
         value = value.detach().cpu().numpy()
     return value
 
 
-def value2list(value: Any, valid_type: Union[Type, Tuple[Type, ...]],
-               expand_dim: int) -> List[Any]:
-    """If the type of ``value`` is ``valid_type``, convert the value to list
-    and expand to ``expand_dim``.
-
+def value2list(
+    value: Any, valid_type: Union[Type, Tuple[Type, ...]], expand_dim: int
+) -> List[Any]:
+    """将 ``value`` 转换为 ``list`` 类型并扩展到 ``expand_dim`` 维.
     Args:
         value (Any): value.
         valid_type (Union[Type, Tuple[Type, ...]): valid type.
@@ -42,23 +32,21 @@ def value2list(value: Any, valid_type: Union[Type, Tuple[Type, ...]],
     return value
 
 
-def check_type(name: str, value: Any,
-               valid_type: Union[Type, Tuple[Type, ...]]) -> None:
-    """Check whether the type of value is in ``valid_type``.
-
+def check_type(
+    name: str, value: Any, valid_type: Union[Type, Tuple[Type, ...]]
+) -> None:
+    """检查 ``value`` 的类型是否在 ``valid_type`` 中.
     Args:
         name (str): value name.
         value (Any): value.
         valid_type (Type, Tuple[Type, ...]): expected type.
     """
     if not isinstance(value, valid_type):
-        raise TypeError(f'`{name}` should be {valid_type} '
-                        f' but got {type(value)}')
+        raise TypeError(f"`{name}` should be {valid_type} " f" but got {type(value)}")
 
 
 def check_length(name: str, value: Any, valid_length: int) -> None:
-    """If type of the ``value`` is list, check whether its length is equal with
-    or greater than ``valid_length``.
+    """检查 ``value`` 的长度是否等于 ``valid_length``.
 
     Args:
         name (str): value name.
@@ -68,24 +56,16 @@ def check_length(name: str, value: Any, valid_length: int) -> None:
     if isinstance(value, list):
         if len(value) < valid_length:
             raise AssertionError(
-                f'The length of {name} must equal with or '
-                f'greater than {valid_length}, but got {len(value)}')
+                f"The length of {name} must equal with or "
+                f"greater than {valid_length}, but got {len(value)}"
+            )
 
 
-def check_type_and_length(name: str, value: Any,
-                          valid_type: Union[Type, Tuple[Type, ...]],
-                          valid_length: int) -> None:
-    """Check whether the type of value is in ``valid_type``. If type of the
-    ``value`` is list, check whether its length is equal with or greater than
-    ``valid_length``.
-
-    Args:
-        value (Any): value.
-        legal_type (Type, Tuple[Type, ...]): legal type.
-        valid_length (int): expected length.
-
-    Returns:
-        List[Any]: value.
+def check_type_and_length(
+    name: str, value: Any, valid_type: Union[Type, Tuple[Type, ...]], valid_length: int
+) -> None:
+    """检查 ``value`` 的类型是否在 ``valid_type`` 中, 如果 ``value`` 的类型为
+    ``list``, 检查其长度是否等于 ``valid_length``.
     """
     check_type(name, value, valid_type)
     check_length(name, value, valid_length)
@@ -94,8 +74,8 @@ def check_type_and_length(name: str, value: Any,
 def color_val_matplotlib(
     colors: Union[str, tuple, List[Union[str, tuple]]]
 ) -> Union[str, tuple, List[Union[str, tuple]]]:
-    """Convert various input in RGB order to normalized RGB matplotlib color
-    tuples,
+    """将 RGB 顺序的数据格式转换为标准化的 matplotlib RGB 格式.
+
     Args:
         colors (Union[str, tuple, List[Union[str, tuple]]]): Color inputs
     Returns:
@@ -117,12 +97,12 @@ def color_val_matplotlib(
         ]
         return colors
     else:
-        raise TypeError(f'Invalid type for color: {type(colors)}')
+        raise TypeError(f"Invalid type for color: {type(colors)}")
 
 
 def color_str2rgb(color: str) -> tuple:
-    """Convert Matplotlib str color to an RGB color which range is 0 to 255,
-    silently dropping the alpha channel.
+    """将 matplotlib 颜色字符串转换为 RGB 格式. 例如, ``'r'`` 转换为 ``(255, 0, 0)``.
+    静默地丢弃 alpha (透明) 通道.
 
     Args:
         color (str): Matplotlib color.
@@ -131,15 +111,18 @@ def color_str2rgb(color: str) -> tuple:
         tuple: RGB color.
     """
     import matplotlib
+
     rgb_color: tuple = matplotlib.colors.to_rgb(color)
     rgb_color = tuple(int(c * 255) for c in rgb_color)
     return rgb_color
 
 
-def convert_overlay_heatmap(feat_map: Union[np.ndarray, torch.Tensor],
-                            img: Optional[np.ndarray] = None,
-                            alpha: float = 0.5) -> np.ndarray:
-    """Convert feat_map to heatmap and overlay on image, if image is not None.
+def convert_overlay_heatmap(
+    feat_map: Union[np.ndarray, torch.Tensor],
+    img: Optional[np.ndarray] = None,
+    alpha: float = 0.5,
+) -> np.ndarray:
+    """将 ``feat_map`` 转换为热图并叠加在图像上, 如果 ``img`` 不为 ``None``.
 
     Args:
         feat_map (np.ndarray, torch.Tensor): The feat_map to convert
@@ -152,8 +135,7 @@ def convert_overlay_heatmap(feat_map: Union[np.ndarray, torch.Tensor],
     Returns:
         np.ndarray: heatmap
     """
-    assert feat_map.ndim == 2 or (feat_map.ndim == 3
-                                  and feat_map.shape[0] in [1, 3])
+    assert feat_map.ndim == 2 or (feat_map.ndim == 3 and feat_map.shape[0] in [1, 3])
     if isinstance(feat_map, torch.Tensor):
         feat_map = feat_map.detach().cpu().numpy()
 
@@ -170,11 +152,8 @@ def convert_overlay_heatmap(feat_map: Union[np.ndarray, torch.Tensor],
     return heat_img
 
 
-def wait_continue(figure, timeout: float = 0, continue_key: str = ' ') -> int:
-    """Show the image and wait for the user's input.
-
-    This implementation refers to
-    https://github.com/matplotlib/matplotlib/blob/v3.5.x/lib/matplotlib/_blocking_input.py
+def wait_continue(figure, timeout: float = 0, continue_key: str = " ") -> int:
+    """展示图像并等待用户输入.
 
     Args:
         timeout (float): If positive, continue after ``timeout`` seconds.
@@ -188,7 +167,8 @@ def wait_continue(figure, timeout: float = 0, continue_key: str = ' ') -> int:
     """
     import matplotlib.pyplot as plt
     from matplotlib.backend_bases import CloseEvent
-    is_inline = 'inline' in plt.get_backend()
+
+    is_inline = "inline" in plt.get_backend()
     if is_inline:
         # If use inline backend, interactive input and timeout is no use.
         return 0
@@ -198,7 +178,6 @@ def wait_continue(figure, timeout: float = 0, continue_key: str = ' ') -> int:
         figure.show()
 
     while True:
-
         # Connect the events to the handler function call.
         event = None
 
@@ -212,7 +191,7 @@ def wait_continue(figure, timeout: float = 0, continue_key: str = ' ') -> int:
 
         cids = [
             figure.canvas.mpl_connect(name, handler)
-            for name in ('key_press_event', 'close_event')
+            for name in ("key_press_event", "close_event")
         ]
 
         try:
@@ -228,8 +207,8 @@ def wait_continue(figure, timeout: float = 0, continue_key: str = ' ') -> int:
             return 0  # Quit for continue.
 
 
-def img_from_canvas(canvas: 'FigureCanvasAgg') -> np.ndarray:
-    """Get RGB image from ``FigureCanvasAgg``.
+def img_from_canvas(canvas: "FigureCanvasAgg") -> np.ndarray:
+    """从 ``FigureCanvasAgg`` 获取 RGB 图像.
 
     Args:
         canvas (FigureCanvasAgg): The canvas to get image.
@@ -238,7 +217,7 @@ def img_from_canvas(canvas: 'FigureCanvasAgg') -> np.ndarray:
         np.ndarray: the output of image in RGB.
     """
     s, (width, height) = canvas.print_to_buffer()
-    buffer = np.frombuffer(s, dtype='uint8')
+    buffer = np.frombuffer(s, dtype="uint8")
     img_rgba = buffer.reshape(height, width, 4)
     rgb, alpha = np.split(img_rgba, [3], axis=2)
-    return rgb.astype('uint8')
+    return rgb.astype("uint8")

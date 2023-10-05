@@ -29,11 +29,11 @@ from TorchTrainer.utils.dist import (
     master_only,
 )
 from TorchTrainer.evaluator import Evaluator
-from TorchTrainer.utils.fileio import FileClient, join_path
+from TorchTrainer.utils.fileio import join_path
 from TorchTrainer.hooks import Hook
-from TorchTrainer.utils.logging import MessageHub, MMLogger, print_log
+from TorchTrainer.utils.logging import MessageHub, GLogger, print_log
 from TorchTrainer.model import (
-    MMDistributedDataParallel,
+    TTDistributedDataParallel,
     convert_sync_batchnorm,
     is_model_wrapper,
     revert_sync_batchnorm,
@@ -59,7 +59,13 @@ from TorchTrainer.utils.registry import (
     RUNNERS,
     VISUALIZERS,
 )
-from TorchTrainer.utils import apply_to, digit_version, get_git_hash, is_seq_of
+from TorchTrainer.utils import (
+    apply_to,
+    digit_version,
+    get_git_hash,
+    is_seq_of,
+    mkdir_or_exist,
+)
 from TorchTrainer.utils.dl_utils import (
     TORCH_VERSION,
     collect_env,
@@ -99,37 +105,38 @@ class Runner:
 
     def __init__(
         self,
-        work_dir: str,
-        model: Union[nn.Module, Dict],
-        data_preprocessor: Union[nn.Module, Dict, None] = None,
-        train_dataloader: Optional[Union[DataLoader, Dict]] = None,
-        train_cfg: Optional[Dict] = None,
-        auto_scale_lr: Optional[Dict] = None,
-        optim_wrapper: Optional[Union[OptimWrapper, Dict]] = None,
-        param_scheduler: Optional[Union[_ParamScheduler, Dict, List]] = None,
-        val_dataloader: Optional[Union[DataLoader, Dict]] = None,
-        val_cfg: Optional[Dict] = None,
-        val_evaluator: Optional[Union[Evaluator, Dict, List]] = None,
-        test_dataloader: Optional[Union[DataLoader, Dict]] = None,
-        test_cfg: Optional[Dict] = None,
-        test_evaluator: Optional[Union[Evaluator, Dict, List]] = None,
-        default_hooks: Optional[Dict[str, Union[Hook, Dict]]] = None,
-        custom_hooks: Optional[List[Union[Hook, Dict]]] = None,
-        load_from: Optional[str] = None,
-        resume: bool = False,
-        launcher: str = "none",
-        env_cfg: Dict = dict(dist_cfg=dict(backend="nccl")),
-        log_processor: Optional[Dict] = None,
-        log_level: str = "INFO",
-        visualizer: Optional[Union[Visualizer, Dict]] = None,
-        randomness: Dict = dict(seed=None),
-        experiment_name: Optional[str] = None,
-        cfg: Optional[ConfigType] = None,
+        work_dir: str,  # 工作目录
+        model: Union[nn.Module, Dict],  # 模型
+        data_preprocessor: Union[nn.Module, Dict, None] = None,  # 模型所需的数据预处理器
+        train_dataloader: Optional[Union[DataLoader, Dict]] = None,  # 训练数据加载器
+        train_cfg: Optional[Dict] = None,  # 训练循环配置
+        auto_scale_lr: Optional[Dict] = None,  # 自动缩放学习率
+        optim_wrapper: Optional[Union[OptimWrapper, Dict]] = None,  # 优化器
+        param_scheduler: Optional[
+            Union[_ParamScheduler, Dict, List]
+        ] = None,  # 优化器参数调度器
+        val_dataloader: Optional[Union[DataLoader, Dict]] = None,  # 验证数据加载器
+        val_cfg: Optional[Dict] = None,  # 验证循环配置
+        val_evaluator: Optional[Union[Evaluator, Dict, List]] = None,  # 验证评估器
+        test_dataloader: Optional[Union[DataLoader, Dict]] = None,  # 测试数据加载器
+        test_cfg: Optional[Dict] = None,  # 测试循环配置
+        test_evaluator: Optional[Union[Evaluator, Dict, List]] = None,  # 测试评估器
+        default_hooks: Optional[Dict[str, Union[Hook, Dict]]] = None,  # 默认钩子
+        custom_hooks: Optional[List[Union[Hook, Dict]]] = None,  # 自定义钩子
+        load_from: Optional[str] = None,  # 加载模型的路径
+        resume: bool = False,  # 是否从断点继续训练
+        launcher: str = "none",  # 启动器
+        env_cfg: Dict = dict(dist_cfg=dict(backend="nccl")),  # 环境配置
+        log_processor: Optional[Dict] = None,  # 日志处理器
+        log_level: str = "INFO",  # 日志级别
+        visualizer: Optional[Union[Visualizer, Dict]] = None,  # 可视化器
+        randomness: Dict = dict(seed=None),  # 随机种子
+        experiment_name: Optional[str] = None,  # 实验名称
+        cfg: Optional[ConfigType] = None,  # 用于从配置参数构造 Runner
     ):
+        # 参数检查: 工作目录 (应该存在)
         self._work_dir = osp.abspath(work_dir)
-        TorchTrainer.mkdir_or_exist(self._work_dir)
-
-        # check cfg
+        mkdir_or_exist(self._work_dir)
 
         if cfg is not None:
             if isinstance(cfg, Config):
@@ -139,18 +146,20 @@ class Runner:
         else:
             self.cfg = Config(dict())
 
+        # 参数检查: 是否训练 (train_dataloader, train_cfg, optim_wrapper 应该全部为 None 或全部不为 None)
         training_related = [train_dataloader, train_cfg, optim_wrapper]
         if not (
             all(item is None for item in training_related)
             or all(item is not None for item in training_related)
         ):
             raise ValueError(
-                "train_dataloader、train_cfg 和 optim_wrapper 应该全部为 None 或不为 None, 但是 "
+                "train_dataloader、 train_cfg 和 optim_wrapper 应该全部为 None 或不为 None, 但是 "
                 f"train_dataloader={train_dataloader}, "
                 f"train_cfg={train_cfg}, "
                 f"optim_wrapper={optim_wrapper}."
             )
 
+        # 参数检查: 学习率调整器(没有 optim_wrapper 时, param_scheduler 应该为 None)
         if (
             param_scheduler is not None and self.optim_wrapper is None
         ):  # 如果不需要调整优化器的学习率、动量或其他参数, param_scheduler 可以为 None
@@ -158,9 +167,10 @@ class Runner:
                 "param_scheduler should be None when optim_wrapper is None, "
                 f"but got {param_scheduler}"
             )
-
+        # 参数检查: 学习率调整器应该是一个列表或字典
         self._check_scheduler_cfg(param_scheduler)
 
+        # 参数检查: 是否有验证 (val_dataloader, val_cfg, val_evaluator 应该全部为 None 或全部不为 None)
         val_related = [val_dataloader, val_cfg, val_evaluator]
         if not (
             all(item is None for item in val_related)
@@ -172,6 +182,7 @@ class Runner:
                 f"val_evaluator={val_evaluator}"
             )
 
+        # 参数检查: 是否有测试 (test_dataloader, test_cfg, test_evaluator 应该全部为 None 或全部不为 None)
         test_related = [test_dataloader, test_cfg, test_evaluator]
         if not (
             all(item is None for item in test_related)
@@ -182,49 +193,49 @@ class Runner:
                 f"test_dataloader={test_dataloader}, test_cfg={test_cfg}, "
                 f"test_evaluator={test_evaluator}"
             )
-
-        # initialize way to launcher multi processes.
+        
+        
+        # 参数初始化: 多进程启动方式的控制参数(_distributed)
         self._launcher = launcher
         if self._launcher == "none":
             self._distributed = False
         else:
             self._distributed = True
 
-        # initialize and record environment
+        # 参数初始化: 分布式环境信息初始化与记录
         self.setup_env(env_cfg)
 
-        # initialize experiment name, if not provided only use current timestamp
+        # 参数初始化: 实验名称记录, 基于时间戳
         if experiment_name is not None:
             self._experiment_name = f"{experiment_name}_{self._timestamp}"
         else:
             self._experiment_name = self.timestamp
 
-        # initialize random seed
+        # 参数初始化: 随机种子(random, numpy, torch, cuda, backends.cudnn)
         self._randomness_cfg = randomness
         self.set_randomness(**randomness)
 
-        # initialize log
+        # 对象构造: 构造日志处理器(log_processor)
         self._log_dir = osp.join(self.work_dir, self.timestamp)
-        TorchTrainer.mkdir_or_exist(self._log_dir)
-        self.log_processor = self.build_log_processor(
-            log_processor
-        )  # Build log processor to format message.
+        mkdir_or_exist(self._log_dir)
+        self.log_processor = self.build_log_processor(log_processor)
         self.logger = self.build_logger(log_level=log_level)
-        self._log_env(env_cfg)  # Collect and log environment information.
-        self.message_hub = (
-            self.build_message_hub()
-        )  # 构建 "message_hub" 以便无法访问 runner 的组件可以从"message_hub"获取迭代或轮数信息.
-        self.visualizer = self.build_visualizer(visualizer)  # 用于写入日志或数据可视化的工具
+
+        # 日志记录: 记录当前运行的环境信息, 包括: TorchTrainer 版本, PyTorch 版本, CUDA 版本, CUDNN 版本, 系统信息, 环境变量, Python 版本, Git 版本
+        self._log_env(env_cfg)
+
+        # 对象构造: 构造消息中心(message_hub)和可视化器(visualizer)
+        self.message_hub = self.build_message_hub()
+        self.visualizer = self.build_visualizer(visualizer)
         if self.cfg:
             self.visualizer.add_config(self.cfg)
 
-        # initialize data
-
+        # 参数初始化: 数据加载器(train_dataloader, val_dataloader, test_dataloader)
         self._train_dataloader = train_dataloader
         self._val_dataloader = val_dataloader
         self._test_dataloader = test_dataloader
 
-        # initialize model
+        # 对象构造: 构造模型(model)
         self._load_from = load_from
         self._resume = resume
         self._has_loaded = (
@@ -232,45 +243,39 @@ class Runner:
         )
 
         if isinstance(model, dict) and data_preprocessor is not None:
-            # Merge the data_preprocessor to model config.
             model.setdefault("data_preprocessor", data_preprocessor)
-        self.model = self.build_model(model)  # build a model
-        self.model = self.wrap_model(
-            self.cfg.get("model_wrapper_cfg"), self.model
-        )  # wrap model
+        self.model = self.build_model(model)
+        self.model = self.wrap_model(self.cfg.get("model_wrapper_cfg"), self.model)
 
         if hasattr(self.model, "module"):
             self._model_name = self.model.module.__class__.__name__
         else:
             self._model_name = self.model.__class__.__name__
 
-        # initialize optimizer
+        # 参数初始化: 优化器(optim_wrapper) 和 优化器参数调度器(param_scheduler)
 
         self.optim_wrapper: Optional[Union[OptimWrapper, dict]]
         self.optim_wrapper = optim_wrapper
         self.auto_scale_lr = auto_scale_lr
         self.param_schedulers = param_scheduler
 
-        # initialize evaluator
+        # 参数初始化: 评估器(val_evaluator, test_evaluator)
         self._val_evaluator = val_evaluator
         self._test_evaluator = test_evaluator
 
-        # initialize loop
+        # 参数初始化: 训练循环(train_loop), 验证循环(val_loop), 测试循环(test_loop)
         self._train_loop = train_cfg
         self._val_loop = val_cfg
         self._test_loop = test_cfg
 
-        # initialize hooks
+        # 对象构造: 构造钩子(hooks)
         self._hooks: List[Hook] = []
-
-        self.register_hooks(
-            default_hooks, custom_hooks
-        )  # register hooks to `self._hooks`
+        self.register_hooks(default_hooks, custom_hooks)
 
         self.logger.info(
             f"Hooks will be executed in the following "
             f"order:\n{self.get_hooks_info()}"
-        )  # log hooks information
+        )
 
         # dump `cfg` to `work_dir`
         self.dump_config()
@@ -319,9 +324,11 @@ class Runner:
         return runner
 
     def setup_env(self, env_cfg: Dict) -> None:
-        """Setup environment.
+        """设置运行环境, 包括:
 
-        An example of ``env_cfg``::
+        - 设置多进程启动方式
+        - 初始化分布式环境
+        - 设置资源限制等
 
             env_cfg = dict(
                 cudnn_benchmark=True,
@@ -332,32 +339,30 @@ class Runner:
                 dist_cfg=dict(backend='nccl', timeout=1800),
                 resource_limit=4096
             )
-
-        Args:
-            env_cfg (dict): Config for setting environment.
         """
-        if env_cfg.get("cudnn_benchmark"):
-            torch.backends.cudnn.benchmark = True
 
+        if env_cfg.get("cudnn_benchmark"):
+            torch.backends.cudnn.benchmark = (
+                True  # 设置为 True 时, 会根据输入数据的大小自动选择最合适的卷积算法, 来达到优化运行效率的问题.
+            )
+
+        # 设置多进程处理环境, 包括: 启动方式, opencv 多线程数, 是否使用分布式环境
         mp_cfg: dict = env_cfg.get("mp_cfg", {})
         set_multi_processing(**mp_cfg, distributed=self.distributed)
 
-        # init distributed env first, since logger depends on the dist info.
+        # 首先设置分布式环境(因为日志记录器依赖于此环境信息), 包括: 多进程启动方式, 分布式后端, 超时时间等
         if self.distributed and not is_distributed():
             dist_cfg: dict = env_cfg.get("dist_cfg", {})
             init_dist(self.launcher, **dist_cfg)
-
-        self._rank, self._world_size = get_dist_info()
+        self._rank, self._world_size = get_dist_info()  # 记录当前进程的分布式全局排名和进程总数
 
         timestamp = torch.tensor(time.time(), dtype=torch.float64)
-        # broadcast timestamp from 0 process to other processes
-        broadcast(timestamp)
+
+        broadcast(timestamp)  # 广播时间戳, 从 0 号进程广播时间戳到其他进程
         self._timestamp = time.strftime(
             "%Y%m%d_%H%M%S", time.localtime(timestamp.item())
         )
 
-        # https://github.com/pytorch/pytorch/issues/973
-        # set resource limit
         if platform.system() != "Windows":
             import resource
 
@@ -372,18 +377,14 @@ class Runner:
     def set_randomness(
         self, seed, diff_rank_seed: bool = False, deterministic: bool = False
     ) -> None:
-        """Set random seed to guarantee reproducible results.
+        """设置随机种子以确保可复现的结果
 
         Args:
             seed (int): A number to set random modules.
-            diff_rank_seed (bool): Whether or not set different seeds according
-                to global rank. Defaults to False.
-            deterministic (bool): Whether to set the deterministic option for
-                CUDNN backend, i.e., set `torch.backends.cudnn.deterministic`
+            diff_rank_seed (bool): 是否根据进程全局排名设置不同的种子. Defaults to False.
+            deterministic (bool): 是否为CUDNN后端设置确定性选项, set `torch.backends.cudnn.deterministic`
                 to True and `torch.backends.cudnn.benchmark` to False.
                 Defaults to False.
-                See https://pytorch.org/docs/stable/notes/randomness.html for
-                more details.
         """
         self._deterministic = deterministic
         self._seed = set_random_seed(
@@ -392,31 +393,18 @@ class Runner:
 
     def build_logger(
         self, log_level: Union[int, str] = "INFO", log_file: str = None, **kwargs
-    ) -> MMLogger:
-        """Build a global asscessable MMLogger.
-
-        Args:
-            log_level (int or str): The log level of MMLogger handlers.
-                Defaults to 'INFO'.
-            log_file (str, optional): Path of filename to save log.
-                Defaults to None.
-            **kwargs: Remaining parameters passed to ``MMLogger``.
-
-        Returns:
-            MMLogger: A MMLogger object build from ``logger``.
-        """
+    ) -> GLogger:
+        """Build a global asscessable GLogger."""
         if log_file is None:
             log_file = osp.join(self._log_dir, f"{self.timestamp}.log")
 
         log_cfg = dict(log_level=log_level, log_file=log_file, **kwargs)
         log_cfg.setdefault("name", self._experiment_name)
-        # `torch.compile` in PyTorch 2.0 could close all user defined handlers
-        # unexpectedly. Using file mode 'a' can help prevent abnormal
-        # termination of the FileHandler and ensure that the log file could
-        # be continuously updated during the lifespan of the runner.
+        # 在PyTorch 2.0中, `torch.compile`可能会意外关闭所有用户定义的处理程序. 
+        # 使用文件模式'a'可以帮助防止 FileHandler 异常终止, 并确保日志文件在运行器的生命周期内能够持续更新. 
         log_cfg.setdefault("file_mode", "a")
 
-        return MMLogger.get_instance(**log_cfg)
+        return GLogger.get_instance(**log_cfg)
 
     def build_message_hub(self, message_hub: Optional[Dict] = None) -> MessageHub:
         """Build a global asscessable MessageHub.
@@ -487,7 +475,7 @@ class Runner:
     def wrap_model(
         self, model_wrapper_cfg: Optional[Dict], model: nn.Module
     ) -> Union[DistributedDataParallel, nn.Module]:
-        """Wrap the model to :obj:`MMDistributedDataParallel` or other custom
+        """Wrap the model to :obj:`TTDistributedDataParallel` or other custom
         distributed data-parallel module wrappers.
 
         An example of ``model_wrapper_cfg``::
@@ -542,14 +530,14 @@ class Runner:
             # Sets the `find_unused_parameters` parameter in
             # torch.nn.parallel.DistributedDataParallel
             # TODO: may use a more elegant way to get local device ID.
-            model = MMDistributedDataParallel(
+            model = TTDistributedDataParallel(
                 module=model,
                 device_ids=[int(os.environ["LOCAL_RANK"])],
                 broadcast_buffers=False,
                 find_unused_parameters=find_unused_parameters,
             )
         else:
-            model_wrapper_cfg.setdefault("type", "MMDistributedDataParallel")
+            model_wrapper_cfg.setdefault("type", "TTDistributedDataParallel")
             model_wrapper_type = MODEL_WRAPPERS.get(model_wrapper_cfg.get("type"))
             default_args: dict = dict()
             if issubclass(model_wrapper_type, DistributedDataParallel):
@@ -724,7 +712,7 @@ class Runner:
 
         - 当仅使用一个优化器时, 返回一个含有指定参数调度器的列表.
         - 当使用多个优化器时, 返回一个字典, 其中 key 与优化器对应, value 对应调度器列表.
-        - 需要注意的是, 如果希望不同的优化器使用不同的参数调度器来更新优化器的超参数, 输入参数 scheduler 必须是一个与优化器参数保持key一致的字典. 否则使用相同的参数调度器来更新所有优化器的超参数。
+        - 需要注意的是, 如果希望不同的优化器使用不同的参数调度器来更新优化器的超参数, 输入参数 scheduler 必须是一个与优化器参数保持key一致的字典. 否则使用相同的参数调度器来更新所有优化器的超参数. 
 
         Examples:
             >>> scheduler_cfg = dict(type='MultiStepLR', milestones=[1, 2])
@@ -1263,36 +1251,13 @@ class Runner:
         self,
         out_dir: str,
         filename: str,
-        file_client_args: Optional[dict] = None,
         save_optimizer: bool = True,
         save_param_scheduler: bool = True,
         meta: Optional[dict] = None,
         by_epoch: bool = True,
         backend_args: Optional[dict] = None,
     ):
-        """Save checkpoints.
-
-        ``CheckpointHook`` invokes this method to save checkpoints
-        periodically.
-
-        Args:
-            out_dir (str): The directory that checkpoints are saved.
-            filename (str): The checkpoint filename.
-            file_client_args (dict, optional): Arguments to instantiate a
-                FileClient. See :class:`TorchTrainer.utils.FileClient` for
-                details. Defaults to None. It will be deprecated in future.
-                Please use `backend_args` instead.
-            save_optimizer (bool): Whether to save the optimizer to
-                the checkpoint. Defaults to True.
-            save_param_scheduler (bool): Whether to save the param_scheduler
-                to the checkpoint. Defaults to True.
-            meta (dict, optional): The meta information to be saved in the
-                checkpoint. Defaults to None.
-            by_epoch (bool): Decide the number of epoch or iteration saved in
-                checkpoint. Defaults to True.
-            backend_args (dict, optional): Arguments to instantiate the
-                prefix of uri corresponding backend. Defaults to None.
-                New in v0.2.0.
+        """Save checkpoints
         """
         if meta is None:
             meta = {}
@@ -1300,32 +1265,15 @@ class Runner:
             raise TypeError(f"meta should be a dict or None, but got {type(meta)}")
 
         if by_epoch:
-            # self.epoch increments 1 after
-            # `self.call_hook('after_train_epoch)` but `save_checkpoint` is
-            # called by `after_train_epoch`` method of `CheckpointHook` so
-            # `epoch` should be `self.epoch + 1`
+            # self.epoch 在调用 `self.call_hook('after_train_epoch')` 后增加1, 
+            # 但是 `save_checkpoint` 是由 `CheckpointHook` 的 `after_train_epoch` 方法调用的, 所以 `epoch` 应该是 `self.epoch + 1`.
             meta.setdefault("epoch", self.epoch + 1)
             meta.setdefault("iter", self.iter)
         else:
             meta.setdefault("epoch", self.epoch)
             meta.setdefault("iter", self.iter + 1)
 
-        if file_client_args is not None:
-            warnings.warn(
-                '"file_client_args" will be deprecated in future. '
-                'Please use "backend_args" instead',
-                DeprecationWarning,
-            )
-            if backend_args is not None:
-                raise ValueError(
-                    '"file_client_args" and "backend_args" cannot be set at '
-                    "the same time."
-                )
-
-            file_client = FileClient.infer_client(file_client_args, out_dir)
-            filepath = file_client.join_path(out_dir, filename)
-        else:
-            filepath = join_path(out_dir, filename, backend_args=backend_args)
+        filepath = join_path(out_dir, filename, backend_args=backend_args)
 
         meta.update(
             cfg=self.cfg.pretty_text,
@@ -1392,7 +1340,6 @@ class Runner:
         save_checkpoint(
             checkpoint,
             filepath,
-            file_client_args=file_client_args,
             backend_args=backend_args,
         )
 
@@ -1678,16 +1625,7 @@ class Runner:
         default_hooks: Optional[Dict[str, Union[Hook, Dict]]] = None,
         custom_hooks: Optional[List[Union[Hook, Dict]]] = None,
     ) -> None:
-        """Register default hooks and custom hooks into hook list.
-
-        Args:
-            default_hooks (dict[str, dict] or dict[str, Hook], optional): Hooks
-                to execute default actions like updating model parameters and
-                saving checkpoints.  Defaults to None.
-            custom_hooks (list[dict] or list[Hook], optional): Hooks to execute
-                custom actions like visualizing images processed by pipeline.
-                Defaults to None.
-        """
+        """Register default hooks and custom hooks into hook list."""
         self.register_default_hooks(default_hooks)
 
         if custom_hooks is not None:
@@ -1705,47 +1643,9 @@ class Runner:
     def _check_scheduler_cfg(
         self, param_scheduler: Optional[Union[dict, list, _ParamScheduler]]
     ) -> None:
-        """Parse `param_scheduler` to a list of parameter schedulers, or a
-        `dict` of which each value is a list of parameter schedulers.
-        #  param_scheduler 应为列表或字典。
-        # 如果 optim_wrapper 是一个只包含一个优化器的字典, 则 param_scheduler 应是包含一个参数调度器列表.
-        # 如果 optim_wrapper 是一个包含多个优化器的字典, 则 param_scheduler 应是一个包含多个参数调度器列表的字典.
-        If only one optimizer is used, the parsed config should be a
-        list of parameter scheduler configs or instances. If multiple
-        optimizers are used, the parsed config should be `dict`.
-        Its key should be consistent with the optimizer `dict` and its value
-        should be a list of parameter scheduler configs or instances. See
-        :meth:`build_param_scheduler` for more details.
-
-        Examples:
-            >>> # valid scheduler:
-            >>> # empty scheduler
-            >>> scheduler = None
-            >>> # Single scheduler
-            >>> scheduler = dict(type='MultiStepLR', milestones=[1, 2])
-            >>> # Single list schedulers
-            >>> scheduler = [dict(type='MultiStepLR', milestones=[1, 2]),
-            >>>              dict(type='MultiStepLR', milestones=[2, 3])]
-            >>> # `dict` of schedulers
-            >>> scheduler = dict(linear1=dict(type='MultiStepLR', milestones=[1, 2]),
-            >>>                  linear2=dict(type='MultiStepLR', milestones=[1, 2]))
-            >>> # `dict` of `list` of schedulers
-            >>> scheduler = dict(linear1=[dict(type='MultiStepLR', milestones=[1, 2])],
-            >>>                  linear2=[dict(type='MultiStepLR', milestones=[1, 2])])
-            >>> # Single built scheduler
-            >>> from TorchTrainer.optim import MultiStepLR
-            >>> scheduler = MultiStepLR(milestones=[1, 2], optimizer=optimizer)
-            >>> # Single built list schedulers
-            >>> scheduler = [MultiStepLR(milestones=[1, 2], optimizer=optimizer)]
-            >>> # dict of built scheduler
-            >>> scheduler = dict(linear1=MultiStepLR(milestones=[1, 2], optimizer=optimizer),
-            >>>                  linear2=MultiStepLR(milestones=[1, 2], optimizer=optimizer))
-            >>> # dict of built list schedulers
-            >>> scheduler = dict(linear1=[MultiStepLR(milestones=[1, 2], optimizer=optimizer)],
-            >>>                  linear2=[MultiStepLR(milestones=[1, 2], optimizer=optimizer)])
-
-        Args:
-            param_scheduler (dict or list): The original parameter scheduler.
+        """将 `param_scheduler` 解析为参数调度器列表或对应字典.
+        如果只使用一个优化器(只包含一个 OptimWrapper 的字典), 则解析后应该是参数调度器参数配置或类实例的列表.
+        如果使用多个优化器(包含多个 OptimWrapper 的字典), 则解析后应该是一个字典. 其 key 值与优化器字典一致, Value 值为参数调度器参数配置或类实例的列表.
         """
         if param_scheduler is None:
             return

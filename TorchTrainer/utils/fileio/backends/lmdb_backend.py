@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from typing import Union
 
@@ -23,17 +22,11 @@ class LmdbBackend(BaseStorageBackend):
         db_path (str): Lmdb database path.
     """
 
-    def __init__(self,
-                 db_path,
-                 readonly=True,
-                 lock=False,
-                 readahead=False,
-                 **kwargs):
+    def __init__(self, db_path, readonly=True, lock=False, readahead=False, **kwargs):
         try:
             import lmdb
         except ImportError:
-            raise ImportError(
-                'Please run "pip install lmdb" to enable LmdbBackend.')
+            raise ImportError('Please run "pip install lmdb" to enable LmdbBackend.')
 
         self.db_path = str(db_path)
         self.readonly = readonly
@@ -50,18 +43,13 @@ class LmdbBackend(BaseStorageBackend):
 
         Returns:
             bytes: Expected bytes object.
-
-        Examples:
-            >>> backend = LmdbBackend('path/to/lmdb')
-            >>> backend.get('key')
-            b'hello world'
         """
         if self._client is None:
             self._client = self._get_client()
 
         filepath = str(filepath)
         with self._client.begin(write=False) as txn:
-            value_buf = txn.get(filepath.encode('ascii'))
+            value_buf = txn.get(filepath.encode("ascii"))
         return value_buf
 
     def get_text(self, filepath, encoding=None):
@@ -75,7 +63,8 @@ class LmdbBackend(BaseStorageBackend):
             readonly=self.readonly,
             lock=self.lock,
             readahead=self.readahead,
-            **self.kwargs)
+            **self.kwargs
+        )
 
     def __del__(self):
         if self._client is not None:

@@ -9,98 +9,35 @@ T = TypeVar("T")
 
 
 def _accquire_lock() -> None:
-    """Acquire the module-level lock for serializing access to shared data.
-
-    This should be released with _release_lock().
-    """
+    """获取锁, 以序列化对共享数据的访问. 在使用完毕后, 请通过_release_lock()释放该锁. """
     if _lock:
         _lock.acquire()
 
 
 def _release_lock() -> None:
-    """Release the module-level lock acquired by calling _accquire_lock()."""
+    """释放通过调用_acquire_lock()获取的模块级锁. """
     if _lock:
         _lock.release()
 
 
-class ManagerMeta(type):
-    """The metaclass for global accessible class.
-
-    The subclasses inheriting from ``ManagerMeta`` will manage their
-    own ``_instance_dict`` and root instances. The constructors of subclasses
-    must contain the ``name`` argument.
-
-    Examples:
-        >>> class SubClass1(metaclass=ManagerMeta):
-        >>>     def __init__(self, *args, **kwargs):
-        >>>         pass
-        AssertionError: <class '__main__.SubClass1'>.__init__ must have the
-        name argument.
-        >>> class SubClass2(metaclass=ManagerMeta):
-        >>>     def __init__(self, name):
-        >>>         pass
-        >>> # valid format.
-    """
-
-    def __init__(cls, *args):
-        cls._instance_dict = OrderedDict()
-        params = inspect.getfullargspec(cls)
-        params_names = params[0] if params[0] else []
-        assert "name" in params_names, f"{cls} must have the `name` argument"
-        super().__init__(*args)
-
-
-class ManagerMixin(metaclass=ManagerMeta):
-    """``ManagerMixin`` is the base class for classes that have global access
-    requirements.
-
-    The subclasses inheriting from ``ManagerMixin`` can get their
-    global instances.
-
-    Examples:
-        >>> class GlobalAccessible(ManagerMixin):
-        >>>     def __init__(self, name=''):
-        >>>         super().__init__(name)
-        >>>
-        >>> GlobalAccessible.get_instance('name')
-        >>> instance_1 = GlobalAccessible.get_instance('name')
-        >>> instance_2 = GlobalAccessible.get_instance('name')
-        >>> assert id(instance_1) == id(instance_2)
-
+class GlobalManager:
+    """``GlobalManager`` 具有全局访问要求的类的基类.
     Args:
         name (str): Name of the instance. Defaults to ''.
     """
+
+    _instance_dict = OrderedDict()  # 类属性, 所有实例共享.
 
     def __init__(self, name: str = "", **kwargs):
         assert (
             isinstance(name, str) and name
         ), "name argument must be an non-empty string."
         self._instance_name = name
+        super().__init__(name)
 
     @classmethod
     def get_instance(cls: Type[T], name: str, **kwargs) -> T:
-        """Get subclass instance by name if the name exists.
-
-        If corresponding name instance has not been created, ``get_instance``
-        will create an instance, otherwise ``get_instance`` will return the
-        corresponding instance.
-
-        Examples
-            >>> instance1 = GlobalAccessible.get_instance('name1')
-            >>> # Create name1 instance.
-            >>> instance.instance_name
-            name1
-            >>> instance2 = GlobalAccessible.get_instance('name1')
-            >>> # Get name1 instance.
-            >>> assert id(instance1) == id(instance2)
-
-        Args:
-            name (str): Name of instance. Defaults to ''.
-
-        Returns:
-            object: Corresponding name instance, the latest instance, or root
-            instance.
-        """
+        """如果名称存在, 则按名称获取子类实例, 否则创建一个新实例."""
         _accquire_lock()
         assert isinstance(name, str), f"type of name should be str, but got {type(cls)}"
         instance_dict = cls._instance_dict
@@ -120,24 +57,7 @@ class ManagerMixin(metaclass=ManagerMeta):
 
     @classmethod
     def get_current_instance(cls):
-        """Get latest created instance.
-
-        Before calling ``get_current_instance``, The subclass must have called
-        ``get_instance(xxx)`` at least once.
-
-        Examples
-            >>> instance = GlobalAccessible.get_current_instance()
-            AssertionError: At least one of name and current needs to be set
-            >>> instance = GlobalAccessible.get_instance('name1')
-            >>> instance.instance_name
-            name1
-            >>> instance = GlobalAccessible.get_current_instance()
-            >>> instance.instance_name
-            name1
-
-        Returns:
-            object: Latest created instance.
-        """
+        """获取最新创建的实例."""
         _accquire_lock()
         if not cls._instance_dict:
             raise RuntimeError(
@@ -150,21 +70,10 @@ class ManagerMixin(metaclass=ManagerMeta):
 
     @classmethod
     def check_instance_created(cls, name: str) -> bool:
-        """Check whether the name corresponding instance exists.
-
-        Args:
-            name (str): Name of instance.
-
-        Returns:
-            bool: Whether the name corresponding instance exists.
-        """
+        """检查名称对应的实例是否存在."""
         return name in cls._instance_dict
 
     @property
     def instance_name(self) -> str:
-        """Get the name of instance.
-
-        Returns:
-            str: Name of instance.
-        """
+        """获取实例名称."""
         return self._instance_name

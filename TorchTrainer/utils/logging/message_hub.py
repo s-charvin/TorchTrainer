@@ -1,84 +1,266 @@
-
 import copy
 import logging
+import warnings
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union, Callable, Sequence, Tuple
 
 import numpy as np
 
-from TorchTrainer.utils import ManagerMixin
-from .history_buffer import HistoryBuffer
+from TorchTrainer.utils import GlobalManager
 from .logger import print_log
 
 if TYPE_CHECKING:
     import torch
 
 
-class MessageHub(ManagerMixin):
-    """Message hub for component interaction. MessageHub is created and
-    accessed in the same way as ManagerMixin.
-
-    ``MessageHub`` will record log information and runtime information. The
-    log information refers to the learning rate, loss, etc. of the model
-    during training phase, which will be stored as ``HistoryBuffer``. The
-    runtime information refers to the iter times, meta information of
-    runner etc., which will be overwritten by next update.
+class HistoryBuffer:
+    """用于记录日志的历史信息并对其进行统计.
 
     Args:
-        name (str): Name of message hub used to get corresponding instance
-            globally.
-        log_scalars (dict, optional): Each key-value pair in the
-            dictionary is the name of the log information such as "loss", "lr",
-            "metric" and their corresponding values. The type of value must be
-            HistoryBuffer. Defaults to None.
-        runtime_info (dict, optional): Each key-value pair in the
-            dictionary is the name of the runtime information and their
-            corresponding values. Defaults to None.
-        resumed_keys (dict, optional): Each key-value pair in the
-            dictionary decides whether the key in :attr:`_log_scalars` and
-            :attr:`_runtime_info` will be serialized.
-
-    Note:
-        Key in :attr:`_resumed_keys` belongs to :attr:`_log_scalars` or
-        :attr:`_runtime_info`. The corresponding value cannot be set
-        repeatedly.
-
-    Examples:
-        >>> # create empty `MessageHub`.
-        >>> message_hub1 = MessageHub('name')
-        >>> log_scalars = dict(loss=HistoryBuffer())
-        >>> runtime_info = dict(task='task')
-        >>> resumed_keys = dict(loss=True)
-        >>> # create `MessageHub` from data.
-        >>> message_hub2 = MessageHub(
-        >>>     name='name',
-        >>>     log_scalars=log_scalars,
-        >>>     runtime_info=runtime_info,
-        >>>     resumed_keys=resumed_keys)
+        log_history (Sequence): History logs. Defaults to [].
+        count_history (Sequence): Counts of history logs. Defaults to [].
+        max_length (int): The max length of history logs. Defaults to 1000000.
     """
 
-    def __init__(self,
-                 name: str,
-                 log_scalars: Optional[dict] = None,
-                 runtime_info: Optional[dict] = None,
-                 resumed_keys: Optional[dict] = None):
-        super().__init__(name)
-        self._log_scalars = self._parse_input('log_scalars', log_scalars)
-        self._runtime_info = self._parse_input('runtime_info', runtime_info)
-        self._resumed_keys = self._parse_input('resumed_keys', resumed_keys)
+    _statistics_methods: dict = dict()
 
-        for value in self._log_scalars.values():
-            assert isinstance(value, HistoryBuffer), \
-                ("The type of log_scalars'value must be HistoryBuffer, but "
-                 f'got {type(value)}')
+    def __init__(
+        self,
+        log_history: Sequence = [],
+        count_history: Sequence = [],
+        max_length: int = 1000000,
+    ):
+        self.max_length = max_length
+        self._set_default_statistics()
+        assert len(log_history) == len(
+            count_history
+        ), "The lengths of log_history and count_histroy should be equal"
+        if len(log_history) > max_length:
+            warnings.warn(
+                f"The length of history buffer({len(log_history)}) "
+                f"exceeds the max_length({max_length}), the first "
+                "few elements will be ignored."
+            )
+            self._log_history = np.array(log_history[-max_length:])
+            self._count_history = np.array(count_history[-max_length:])
+        else:
+            self._log_history = np.array(log_history)
+            self._count_history = np.array(count_history)
 
-        for key in self._resumed_keys.keys():
-            assert key in self._log_scalars or key in self._runtime_info, \
-                ('Key in `resumed_keys` must contained in `log_scalars` or '
-                 f'`runtime_info`, but got {key}')
+    def _set_default_statistics(self) -> None:
+        """Register default statistic methods: min, max, current and mean."""
+        self._statistics_methods.setdefault("min", HistoryBuffer.min)
+        self._statistics_methods.setdefault("max", HistoryBuffer.max)
+        self._statistics_methods.setdefault("current", HistoryBuffer.current)
+        self._statistics_methods.setdefault("mean", HistoryBuffer.mean)
+
+    def update(self, log_val: Union[int, float], count: int = 1) -> None:
+        """update the log history.
+
+        If the length of the buffer exceeds ``self._max_length``, the oldest
+        element will be removed from the buffer.
+
+        Args:
+            log_val (int or float): The value of log.
+            count (int): The accumulation times of log, defaults to 1.
+            ``count`` will be used in smooth statistics.
+        """
+        if not isinstance(log_val, (int, float)) or not isinstance(count, (int, float)):
+            raise TypeError(
+                f"log_val must be int or float but got "
+                f"{type(log_val)}, count must be int but got "
+                f"{type(count)}"
+            )
+        self._log_history = np.append(self._log_history, log_val)
+        self._count_history = np.append(self._count_history, count)
+        if len(self._log_history) > self.max_length:
+            self._log_history = self._log_history[-self.max_length :]
+            self._count_history = self._count_history[-self.max_length :]
+
+    @property
+    def data(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Get the ``_log_history`` and ``_count_history``.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: History logs and the counts of
+            the history logs.
+        """
+        return self._log_history, self._count_history
 
     @classmethod
-    def get_current_instance(cls) -> 'MessageHub':
+    def register_statistics(cls, method: Callable) -> Callable:
+        """Register custom statistics method to ``_statistics_methods``.
+
+        The registered method can be called by ``history_buffer.statistics``
+        with corresponding method name and arguments.
+
+        Args:
+            method (Callable): Custom statistics method.
+        Returns:
+            Callable: Original custom statistics method.
+        """
+        method_name = method.__name__
+        assert (
+            method_name not in cls._statistics_methods
+        ), "method_name cannot be registered twice!"
+        cls._statistics_methods[method_name] = method
+        return method
+
+    def statistics(self, method_name: str, *arg, **kwargs) -> Any:
+        """Access statistics method by name.
+
+        Args:
+            method_name (str): Name of method.
+
+        Returns:
+            Any: Depends on corresponding method.
+        """
+        if method_name not in self._statistics_methods:
+            raise KeyError(
+                f"{method_name} has not been registered in "
+                "HistoryBuffer._statistics_methods"
+            )
+        method = self._statistics_methods[method_name]
+        # Provide self arguments for registered functions.
+        return method(self, *arg, **kwargs)
+
+    def mean(self, window_size: Optional[int] = None) -> np.ndarray:
+        """Return the mean of the latest ``window_size`` values in log
+        histories.
+
+        If ``window_size is None`` or ``window_size > len(self._log_history)``,
+        return the global mean value of history logs.
+
+        Args:
+            window_size (int, optional): Size of statistics window.
+        Returns:
+            np.ndarray: Mean value within the window.
+        """
+        if window_size is not None:
+            assert isinstance(window_size, int), (
+                "The type of window size should be int, but got " f"{type(window_size)}"
+            )
+        else:
+            window_size = len(self._log_history)
+        logs_sum = self._log_history[-window_size:].sum()
+        counts_sum = self._count_history[-window_size:].sum()
+        return logs_sum / counts_sum
+
+    def max(self, window_size: Optional[int] = None) -> np.ndarray:
+        """Return the maximum value of the latest ``window_size`` values in log
+        histories.
+
+        If ``window_size is None`` or ``window_size > len(self._log_history)``,
+        return the global maximum value of history logs.
+
+        Args:
+            window_size (int, optional): Size of statistics window.
+        Returns:
+            np.ndarray: The maximum value within the window.
+        """
+        if window_size is not None:
+            assert isinstance(window_size, int), (
+                "The type of window size should be int, but got " f"{type(window_size)}"
+            )
+        else:
+            window_size = len(self._log_history)
+        return self._log_history[-window_size:].max()
+
+    def min(self, window_size: Optional[int] = None) -> np.ndarray:
+        """Return the minimum value of the latest ``window_size`` values in log
+        histories.
+
+        If ``window_size is None`` or ``window_size > len(self._log_history)``,
+        return the global minimum value of history logs.
+
+        Args:
+            window_size (int, optional): Size of statistics window.
+        Returns:
+            np.ndarray: The minimum value within the window.
+        """
+        if window_size is not None:
+            assert isinstance(window_size, int), (
+                "The type of window size should be int, but got " f"{type(window_size)}"
+            )
+        else:
+            window_size = len(self._log_history)
+        return self._log_history[-window_size:].min()
+
+    def current(self) -> np.ndarray:
+        """Return the recently updated values in log histories.
+
+        Returns:
+            np.ndarray: Recently updated values in log histories.
+        """
+        if len(self._log_history) == 0:
+            raise ValueError(
+                "HistoryBuffer._log_history is an empty array! "
+                "please call update first"
+            )
+        return self._log_history[-1]
+
+    def __getstate__(self) -> dict:
+        """Make ``_statistics_methods`` can be resumed.
+
+        Returns:
+            dict: State dict including statistics_methods.
+        """
+        self.__dict__.update(statistics_methods=self._statistics_methods)
+        return self.__dict__
+
+    def __setstate__(self, state):
+        """Try to load ``_statistics_methods`` from state.
+
+        Args:
+            state (dict): State dict.
+        """
+        statistics_methods = state.pop("statistics_methods", {})
+        self._set_default_statistics()
+        self._statistics_methods.update(statistics_methods)
+        self.__dict__.update(state)
+
+
+class MessageHub(GlobalManager):
+    """组件交互的消息中心. MessageHub 的创建和访问方式与 GlobalManager 相同.
+
+    ``MessageHub``将记录日志信息和运行时信息. 日志信息指的是模型在训练阶段的学习率、损失等, 将以``HistoryBuffer``的形式存储. 运行时信息指的是迭代次数、运行器的元信息等, 将被下一次更新覆盖.
+
+    Args:
+        name (str): 用于全局获取相应实例的消息中心的名称.
+        log_scalars (dict, optional): 字典中的每个键值对都是日志信息的名称, 例如"loss"、"lr"、"metric"及其对应的值. 值的类型必须是``HistoryBuffer``. 默认为None.
+        runtime_info (dict, optional): 字典中的每个键值对都是运行时信息的名称及其对应的值. 默认为None.
+        resumed_keys (dict, optional): 字典中的每个键值对决定了是否对:attr:`_log_scalars`和:attr:`_runtime_info`中的键进行序列化.
+
+    Note:
+        :attr:`_resumed_keys`中的键属于:attr:`_log_scalars`或:attr:`_runtime_info`. 对应的值不能重复设置.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        log_scalars: Optional[dict] = None,
+        runtime_info: Optional[dict] = None,
+        resumed_keys: Optional[dict] = None,
+    ):
+        super().__init__(name)
+        self._log_scalars = self._parse_input("log_scalars", log_scalars)
+        self._runtime_info = self._parse_input("runtime_info", runtime_info)
+        self._resumed_keys = self._parse_input("resumed_keys", resumed_keys)
+
+        for value in self._log_scalars.values():
+            assert isinstance(value, HistoryBuffer), (
+                "The type of log_scalars'value must be HistoryBuffer, but "
+                f"got {type(value)}"
+            )
+
+        for key in self._resumed_keys.keys():
+            assert key in self._log_scalars or key in self._runtime_info, (
+                "Key in `resumed_keys` must contained in `log_scalars` or "
+                f"`runtime_info`, but got {key}"
+            )
+
+    @classmethod
+    def get_current_instance(cls) -> "MessageHub":
         """Get latest created ``MessageHub`` instance.
 
         :obj:`MessageHub` can call :meth:`get_current_instance` before any
@@ -89,14 +271,16 @@ class MessageHub(ManagerMixin):
             MessageHub: Empty ``MessageHub`` instance.
         """
         if not cls._instance_dict:
-            cls.get_instance('TorchTrainer')
+            cls.get_instance("TorchTrainer")
         return super().get_current_instance()
 
-    def update_scalar(self,
-                      key: str,
-                      value: Union[int, float, np.ndarray, 'torch.Tensor'],
-                      count: int = 1,
-                      resumed: bool = True) -> None:
+    def update_scalar(
+        self,
+        key: str,
+        value: Union[int, float, np.ndarray, "torch.Tensor"],
+        count: int = 1,
+        resumed: bool = True,
+    ) -> None:
         """Update :attr:_log_scalars.
 
         Update ``HistoryBuffer`` in :attr:`_log_scalars`. If corresponding key
@@ -130,8 +314,9 @@ class MessageHub(ManagerMixin):
         """
         self._set_resumed_keys(key, resumed)
         checked_value = self._get_valid_value(value)
-        assert isinstance(count, int), (
-            f'The type of count must be int. but got {type(count): {count}}')
+        assert isinstance(
+            count, int
+        ), f"The type of count must be int. but got {type(count): {count}}"
         if key in self._log_scalars:
             self._log_scalars[key].update(checked_value, count)
         else:
@@ -163,20 +348,20 @@ class MessageHub(ManagerMixin):
             >>> message_hub.update_scalars(log_dict)
             >>> # The count of `c` is 2.
         """
-        assert isinstance(log_dict, dict), ('`log_dict` must be a dict!, '
-                                            f'but got {type(log_dict)}')
+        assert isinstance(log_dict, dict), (
+            "`log_dict` must be a dict!, " f"but got {type(log_dict)}"
+        )
         for log_name, log_val in log_dict.items():
             if isinstance(log_val, dict):
-                assert 'value' in log_val, \
-                    f'value must be defined in {log_val}'
-                count = self._get_valid_value(log_val.get('count', 1))
-                value = log_val['value']
+                assert "value" in log_val, f"value must be defined in {log_val}"
+                count = self._get_valid_value(log_val.get("count", 1))
+                value = log_val["value"]
             else:
                 count = 1
                 value = log_val
-            assert isinstance(count,
-                              int), ('The type of count must be int. but got '
-                                     f'{type(count): {count}}')
+            assert isinstance(count, int), (
+                "The type of count must be int. but got " f"{type(count): {count}}"
+            )
             self.update_scalar(log_name, value, count, resumed)
 
     def update_info(self, key: str, value: Any, resumed: bool = True) -> None:
@@ -221,8 +406,9 @@ class MessageHub(ManagerMixin):
             resumed (bool): Whether the corresponding ``HistoryBuffer``
                 could be resumed.
         """
-        assert isinstance(info_dict, dict), ('`log_dict` must be a dict!, '
-                                             f'but got {type(info_dict)}')
+        assert isinstance(info_dict, dict), (
+            "`log_dict` must be a dict!, " f"but got {type(info_dict)}"
+        )
         for key, value in info_dict.items():
             self.update_info(key, value, resumed=resumed)
 
@@ -241,9 +427,10 @@ class MessageHub(ManagerMixin):
         if key not in self._resumed_keys:
             self._resumed_keys[key] = resumed
         else:
-            assert self._resumed_keys[key] == resumed, \
-                f'{key} used to be {self._resumed_keys[key]}, but got ' \
-                '{resumed} now. resumed keys cannot be modified repeatedly.'
+            assert self._resumed_keys[key] == resumed, (
+                f"{key} used to be {self._resumed_keys[key]}, but got "
+                "{resumed} now. resumed keys cannot be modified repeatedly."
+            )
 
     @property
     def log_scalars(self) -> OrderedDict:
@@ -284,8 +471,10 @@ class MessageHub(ManagerMixin):
             key exists.
         """
         if key not in self.log_scalars:
-            raise KeyError(f'{key} is not found in Messagehub.log_buffers: '
-                           f'instance name is: {MessageHub.instance_name}')
+            raise KeyError(
+                f"{key} is not found in Messagehub.log_buffers: "
+                f"instance name is: {MessageHub.instance_name}"
+            )
         return self.log_scalars[key]
 
     def get_info(self, key: str, default: Optional[Any] = None) -> Any:
@@ -309,7 +498,7 @@ class MessageHub(ManagerMixin):
 
     def _get_valid_value(
         self,
-        value: Union['torch.Tensor', np.ndarray, np.number, int, float],
+        value: Union["torch.Tensor", np.ndarray, np.number, int, float],
     ) -> Union[int, float]:
         """Convert value to python built-in type.
 
@@ -328,7 +517,7 @@ class MessageHub(ManagerMixin):
         else:
             # check whether value is torch.Tensor but don't want
             # to import torch in this file
-            assert hasattr(value, 'numel') and value.numel() == 1
+            assert hasattr(value, "numel") and value.numel() == 1
             value = value.item()
         return value
 
@@ -355,17 +544,19 @@ class MessageHub(ManagerMixin):
                     saved_info[key] = copy.deepcopy(value)
                 except:
                     print_log(
-                        f'{key} in message_hub cannot be copied, '
-                        f'just return its reference. ',
-                        logger='current',
-                        level=logging.WARNING)
+                        f"{key} in message_hub cannot be copied, "
+                        f"just return its reference. ",
+                        logger="current",
+                        level=logging.WARNING,
+                    )
                     saved_info[key] = value
         return dict(
             log_scalars=saved_scalars,
             runtime_info=saved_info,
-            resumed_keys=self._resumed_keys)
+            resumed_keys=self._resumed_keys,
+        )
 
-    def load_state_dict(self, state_dict: Union['MessageHub', dict]) -> None:
+    def load_state_dict(self, state_dict: Union["MessageHub", dict]) -> None:
         """Loads log scalars, runtime information and resumed keys from
         ``state_dict`` or ``message_hub``.
 
@@ -383,50 +574,56 @@ class MessageHub(ManagerMixin):
                 MessageHub instance.
         """
         if isinstance(state_dict, dict):
-            for key in ('log_scalars', 'runtime_info', 'resumed_keys'):
+            for key in ("log_scalars", "runtime_info", "resumed_keys"):
                 assert key in state_dict, (
-                    'The loaded `state_dict` of `MessageHub` must contain '
-                    f'key: `{key}`')
+                    "The loaded `state_dict` of `MessageHub` must contain "
+                    f"key: `{key}`"
+                )
             # The old `MessageHub` could save non-HistoryBuffer `log_scalars`,
             # therefore the loaded `log_scalars` needs to be filtered.
-            for key, value in state_dict['log_scalars'].items():
+            for key, value in state_dict["log_scalars"].items():
                 if not isinstance(value, HistoryBuffer):
                     print_log(
-                        f'{key} in message_hub is not HistoryBuffer, '
-                        f'just skip resuming it.',
-                        logger='current',
-                        level=logging.WARNING)
+                        f"{key} in message_hub is not HistoryBuffer, "
+                        f"just skip resuming it.",
+                        logger="current",
+                        level=logging.WARNING,
+                    )
                     continue
                 self.log_scalars[key] = value
 
-            for key, value in state_dict['runtime_info'].items():
+            for key, value in state_dict["runtime_info"].items():
                 try:
                     self._runtime_info[key] = copy.deepcopy(value)
                 except:
                     print_log(
-                        f'{key} in message_hub cannot be copied, '
-                        f'just return its reference.',
-                        logger='current',
-                        level=logging.WARNING)
+                        f"{key} in message_hub cannot be copied, "
+                        f"just return its reference.",
+                        logger="current",
+                        level=logging.WARNING,
+                    )
                     self._runtime_info[key] = value
 
-            for key, value in state_dict['resumed_keys'].items():
-                if key not in set(self.log_scalars.keys()) | \
-                        set(self._runtime_info.keys()):
+            for key, value in state_dict["resumed_keys"].items():
+                if key not in set(self.log_scalars.keys()) | set(
+                    self._runtime_info.keys()
+                ):
                     print_log(
-                        f'resumed key: {key} is not defined in message_hub, '
-                        f'just skip resuming this key.',
-                        logger='current',
-                        level=logging.WARNING)
+                        f"resumed key: {key} is not defined in message_hub, "
+                        f"just skip resuming this key.",
+                        logger="current",
+                        level=logging.WARNING,
+                    )
                     continue
                 elif not value:
                     print_log(
-                        f'Although resumed key: {key} is False, {key} '
-                        'will still be loaded this time. This key will '
-                        'not be saved by the next calling of '
-                        '`MessageHub.state_dict()`',
-                        logger='current',
-                        level=logging.WARNING)
+                        f"Although resumed key: {key} is False, {key} "
+                        "will still be loaded this time. This key will "
+                        "not be saved by the next calling of "
+                        "`MessageHub.state_dict()`",
+                        logger="current",
+                        level=logging.WARNING,
+                    )
                 self._resumed_keys[key] = value
 
         # Since some checkpoints saved serialized `message_hub` instance,
@@ -452,5 +649,6 @@ class MessageHub(ManagerMixin):
         elif isinstance(value, dict):
             return OrderedDict(value)
         else:
-            raise TypeError(f'{name} should be a dict or `None`, but '
-                            f'got {type(name)}')
+            raise TypeError(
+                f"{name} should be a dict or `None`, but " f"got {type(name)}"
+            )

@@ -28,7 +28,7 @@ TRANSFORMS = Registry("transform")
 
 # mangage all kinds of modules inheriting `nn.Module`
 MODELS = Registry("model", build_model_from_cfg)
-# mangage all kinds of model wrappers like 'MMDistributedDataParallel'
+# mangage all kinds of model wrappers like 'TTDistributedDataParallel'
 MODEL_WRAPPERS = Registry("model_wrapper")
 # mangage all kinds of weight initialization modules like `Uniform`
 WEIGHT_INITIALIZERS = Registry("weight_initializer")

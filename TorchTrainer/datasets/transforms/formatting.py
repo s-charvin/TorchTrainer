@@ -117,7 +117,18 @@ class ImageToTensor(BaseTransform):
 
 @TRANSFORMS.register_module()
 class PackAudioClsInputs(BaseTransform):
-    """为语音分类模型打包输入数据."""
+    """为语音分类模型打包输入数据.
+    需要提供的数据:
+    inputs:
+        - *_audio_data: np.ndarray
+    meta:
+        - audio_path: str
+        - sample_rate: int
+        - label_id: int
+        - num_classes: int
+
+
+    """
 
     def __init__(
         self,
@@ -138,11 +149,10 @@ class PackAudioClsInputs(BaseTransform):
 
     @staticmethod
     def format_input(input_):
-        """用于将
-        """
-        if isinstance(input_, list):
-            return [PackAudioClsInputs.format_input(item) for item in input_]
-        elif isinstance(input_, np.ndarray):
+        """用来将输入数据转换为 torch.Tensor 类型."""
+        # if isinstance(input_, list):
+        #     return [PackAudioClsInputs.format_input(item) for item in input_]
+        if isinstance(input_, np.ndarray):
             if input_.ndim == 2:
                 input_ = np.expand_dims(input_, 0)  # (H, W) -> (1, H, W)
             if input_.ndim == 3 and not input_.flags.c_contiguous:
@@ -160,16 +170,14 @@ class PackAudioClsInputs(BaseTransform):
         if self.keys is None:
             self.keys = [key for key in results.keys() if (self.prefix in key)]
 
+        assert len(self.keys) > 0, "No audio data found."
+        assert "label_id" in results, "label_id must be provided."
+
         packed_results = dict()
         packed_results["inputs"] = dict()
 
         for key in self.keys:
-            packed_results["inputs"][key] = []
-            data = results.pop(key)
-            if not isinstance(data, List):
-                data = [data]
-            for i, data_ in enumerate(data):
-                packed_results["inputs"][key].append(self.format_input(data_))
+            packed_results["inputs"][key] = self.format_input(results.pop(key))
         data_sample = ClsDataSample()
 
         # Set default keys

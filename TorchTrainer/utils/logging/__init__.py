@@ -1,6 +1,4 @@
+from .logger import GLogger, print_log
+from .message_hub import MessageHub, HistoryBuffer
 
-from .history_buffer import HistoryBuffer
-from .logger import MMLogger, print_log
-from .message_hub import MessageHub
-
-__all__ = ['HistoryBuffer', 'MessageHub', 'MMLogger', 'print_log']
+__all__ = ["HistoryBuffer", "MessageHub", "GLogger", "print_log"]

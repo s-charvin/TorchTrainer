@@ -17,16 +17,9 @@ def get_config(cfg_path: str, pretrained: bool = False) -> Config:
             ``pretrained==True``, the url of pretrained model can be accessed
             by ``cfg.model_path``. Defaults to False.
 
-    Examples:
-        >>> cfg = get_config('mmdet::faster_rcnn/faster-rcnn_r50_fpn_1x_coco.py', pretrained=True)
-        >>> # Equivalent to
-        >>> # cfg = Config.fromfile('/path/to/faster-rcnn_r50_fpn_1x_coco.py')
-        >>> cfg.model_path
-        https://download.openmmlab.com/mmdetection/v2.0/faster_rcnn/faster_rcnn_r50_fpn_1x_coco/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth
-
     Returns:
         Config: A `Config` parsed from external package.
-    """  # noqa E301
+    """
     # Get package name and relative config path.
     package, cfg_path = _get_package_and_cfg_path(cfg_path)
     # Install package if it's not installed.
@@ -60,11 +53,6 @@ def get_model(cfg_path: str, pretrained: bool = False, **kwargs):
             'package::' and without suffix.
         pretrained (bool): Whether to load pretrained model. Defaults to False.
         kwargs (dict): Default arguments to build model.
-
-    Examples:
-        >>> model = get_model('mmdet::faster_rcnn/faster-rcnn_r50_fpn_1x_coco.py', pretrained=True)
-        >>> type(model)
-        <class 'mmdet.models.detectors.faster_rcnn.FasterRCNN'>
 
     Returns:
         nn.Module: Built model.

@@ -1,4 +1,3 @@
-
 import copy
 import functools
 import logging
@@ -16,7 +15,7 @@ import torch
 from TorchTrainer.config import Config
 from TorchTrainer.utils.fileio import dump
 from TorchTrainer.hooks.logger_hook import SUFFIX_TYPE
-from TorchTrainer.utils.logging import MMLogger, print_log
+from TorchTrainer.utils.logging import GLogger, print_log
 from TorchTrainer.utils.registry import VISBACKENDS
 from TorchTrainer.utils import scandir
 from TorchTrainer.utils.dl_utils import TORCH_VERSION
@@ -39,20 +38,20 @@ def force_init_env(old_func: Callable) -> Any:
     @functools.wraps(old_func)
     def wrapper(obj: object, *args, **kwargs):
         # The instance must have `_init_env` method.
-        if not hasattr(obj, '_init_env'):
-            raise AttributeError(f'{type(obj)} does not have _init_env '
-                                 'method.')
+        if not hasattr(obj, "_init_env"):
+            raise AttributeError(f"{type(obj)} does not have _init_env " "method.")
         # If instance does not have `_env_initialized` attribute or
         # `_env_initialized` is False, call `_init_env` and set
         # `_env_initialized` to True
-        if not getattr(obj, '_env_initialized', False):
+        if not getattr(obj, "_env_initialized", False):
             print_log(
-                'Attribute `_env_initialized` is not defined in '
-                f'{type(obj)} or `{type(obj)}._env_initialized is '
-                'False, `_init_env` will be called and '
-                f'{type(obj)}._env_initialized will be set to True',
-                logger='current',
-                level=logging.DEBUG)
+                "Attribute `_env_initialized` is not defined in "
+                f"{type(obj)} or `{type(obj)}._env_initialized is "
+                "False, `_init_env` will be called and "
+                f"{type(obj)}._env_initialized will be set to True",
+                logger="current",
+                level=logging.DEBUG,
+            )
             obj._init_env()
             obj._env_initialized = True
 
@@ -102,8 +101,9 @@ class BaseVisBackend(metaclass=ABCMeta):
         """
         pass
 
-    def add_graph(self, model: torch.nn.Module, data_batch: Sequence[dict],
-                  **kwargs) -> None:
+    def add_graph(
+        self, model: torch.nn.Module, data_batch: Sequence[dict], **kwargs
+    ) -> None:
         """Record the model graph.
 
         Args:
@@ -112,11 +112,7 @@ class BaseVisBackend(metaclass=ABCMeta):
         """
         pass
 
-    def add_image(self,
-                  name: str,
-                  image: np.ndarray,
-                  step: int = 0,
-                  **kwargs) -> None:
+    def add_image(self, name: str, image: np.ndarray, step: int = 0, **kwargs) -> None:
         """Record the image.
 
         Args:
@@ -127,11 +123,9 @@ class BaseVisBackend(metaclass=ABCMeta):
         """
         pass
 
-    def add_scalar(self,
-                   name: str,
-                   value: Union[int, float],
-                   step: int = 0,
-                   **kwargs) -> None:
+    def add_scalar(
+        self, name: str, value: Union[int, float], step: int = 0, **kwargs
+    ) -> None:
         """Record the scalar.
 
         Args:
@@ -141,11 +135,13 @@ class BaseVisBackend(metaclass=ABCMeta):
         """
         pass
 
-    def add_scalars(self,
-                    scalar_dict: dict,
-                    step: int = 0,
-                    file_path: Optional[str] = None,
-                    **kwargs) -> None:
+    def add_scalars(
+        self,
+        scalar_dict: dict,
+        step: int = 0,
+        file_path: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Record the scalars' data.
 
         Args:
@@ -195,13 +191,15 @@ class LocalVisBackend(BaseVisBackend):
             Defaults to 'scalars.json'.
     """
 
-    def __init__(self,
-                 save_dir: str,
-                 img_save_dir: str = 'vis_image',
-                 config_save_file: str = 'config.py',
-                 scalar_save_file: str = 'scalars.json'):
-        assert config_save_file.split('.')[-1] == 'py'
-        assert scalar_save_file.split('.')[-1] == 'json'
+    def __init__(
+        self,
+        save_dir: str,
+        img_save_dir: str = "vis_image",
+        config_save_file: str = "config.py",
+        scalar_save_file: str = "scalars.json",
+    ):
+        assert config_save_file.split(".")[-1] == "py"
+        assert scalar_save_file.split(".")[-1] == "json"
         super().__init__(save_dir)
         self._img_save_dir = img_save_dir
         self._config_save_file = config_save_file
@@ -211,19 +209,13 @@ class LocalVisBackend(BaseVisBackend):
         """Init save dir."""
         if not os.path.exists(self._save_dir):
             os.makedirs(self._save_dir, exist_ok=True)
-        self._img_save_dir = osp.join(
-            self._save_dir,
-            self._img_save_dir)
-        self._config_save_file = osp.join(
-            self._save_dir,
-            self._config_save_file)
-        self._scalar_save_file = osp.join(
-            self._save_dir,
-            self._scalar_save_file)
+        self._img_save_dir = osp.join(self._save_dir, self._img_save_dir)
+        self._config_save_file = osp.join(self._save_dir, self._config_save_file)
+        self._scalar_save_file = osp.join(self._save_dir, self._scalar_save_file)
 
     @property
     @force_init_env
-    def experiment(self) -> 'LocalVisBackend':
+    def experiment(self) -> "LocalVisBackend":
         """Return the experiment object associated with this visualization
         backend."""
         return self
@@ -239,11 +231,7 @@ class LocalVisBackend(BaseVisBackend):
         config.dump(self._config_save_file)
 
     @force_init_env
-    def add_image(self,
-                  name: str,
-                  image: np.array,
-                  step: int = 0,
-                  **kwargs) -> None:
+    def add_image(self, name: str, image: np.array, step: int = 0, **kwargs) -> None:
         """Record the image to disk.
 
         Args:
@@ -255,15 +243,17 @@ class LocalVisBackend(BaseVisBackend):
         assert image.dtype == np.uint8
         drawn_image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         os.makedirs(self._img_save_dir, exist_ok=True)
-        save_file_name = f'{name}_{step}.png'
+        save_file_name = f"{name}_{step}.png"
         cv2.imwrite(osp.join(self._img_save_dir, save_file_name), drawn_image)
 
     @force_init_env
-    def add_scalar(self,
-                   name: str,
-                   value: Union[int, float, torch.Tensor, np.ndarray],
-                   step: int = 0,
-                   **kwargs) -> None:
+    def add_scalar(
+        self,
+        name: str,
+        value: Union[int, float, torch.Tensor, np.ndarray],
+        step: int = 0,
+        **kwargs,
+    ) -> None:
         """Record the scalar data to disk.
 
         Args:
@@ -273,14 +263,16 @@ class LocalVisBackend(BaseVisBackend):
         """
         if isinstance(value, torch.Tensor):
             value = value.item()
-        self._dump({name: value, 'step': step}, self._scalar_save_file, 'json')
+        self._dump({name: value, "step": step}, self._scalar_save_file, "json")
 
     @force_init_env
-    def add_scalars(self,
-                    scalar_dict: dict,
-                    step: int = 0,
-                    file_path: Optional[str] = None,
-                    **kwargs) -> None:
+    def add_scalars(
+        self,
+        scalar_dict: dict,
+        step: int = 0,
+        file_path: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Record the scalars to disk.
 
         The scalar dict will be written to the default and
@@ -298,21 +290,19 @@ class LocalVisBackend(BaseVisBackend):
         """
         assert isinstance(scalar_dict, dict)
         scalar_dict = copy.deepcopy(scalar_dict)
-        scalar_dict.setdefault('step', step)
+        scalar_dict.setdefault("step", step)
 
         if file_path is not None:
-            assert file_path.split('.')[-1] == 'json'
-            new_save_file_path = osp.join(
-                self._save_dir,
-                file_path)
-            assert new_save_file_path != self._scalar_save_file, \
-                '``file_path`` and ``scalar_save_file`` have the ' \
-                'same name, please set ``file_path`` to another value'
-            self._dump(scalar_dict, new_save_file_path, 'json')
-        self._dump(scalar_dict, self._scalar_save_file, 'json')
+            assert file_path.split(".")[-1] == "json"
+            new_save_file_path = osp.join(self._save_dir, file_path)
+            assert new_save_file_path != self._scalar_save_file, (
+                "``file_path`` and ``scalar_save_file`` have the "
+                "same name, please set ``file_path`` to another value"
+            )
+            self._dump(scalar_dict, new_save_file_path, "json")
+        self._dump(scalar_dict, self._scalar_save_file, "json")
 
-    def _dump(self, value_dict: dict, file_path: str,
-              file_format: str) -> None:
+    def _dump(self, value_dict: dict, file_path: str, file_format: str) -> None:
         """dump dict to file.
 
         Args:
@@ -320,9 +310,9 @@ class LocalVisBackend(BaseVisBackend):
            file_path (str): The file path to save data.
            file_format (str): The file format to save data.
         """
-        with open(file_path, 'a+') as f:
+        with open(file_path, "a+") as f:
             dump(value_dict, f, file_format=file_format)
-            f.write('\n')
+            f.write("\n")
 
 
 @VISBACKENDS.register_module()
@@ -371,18 +361,18 @@ class WandbVisBackend(BaseVisBackend):
             source-$PROJECT_ID-$ENTRYPOINT_RELPATH. See
             `wandb log_code <https://docs.wandb.ai/ref/python/run#log_code>`_
             for details. Defaults to None.
-            `New in version 0.3.0.`
         watch_kwargs (optional, dict): Agurments for ``wandb.watch``.
-            `New in version 0.4.0.`
     """
 
-    def __init__(self,
-                 save_dir: str,
-                 init_kwargs: Optional[dict] = None,
-                 define_metric_cfg: Union[dict, list, None] = None,
-                 commit: Optional[bool] = True,
-                 log_code_name: Optional[str] = None,
-                 watch_kwargs: Optional[dict] = None):
+    def __init__(
+        self,
+        save_dir: str,
+        init_kwargs: Optional[dict] = None,
+        define_metric_cfg: Union[dict, list, None] = None,
+        commit: Optional[bool] = True,
+        log_code_name: Optional[str] = None,
+        watch_kwargs: Optional[dict] = None,
+    ):
         super().__init__(save_dir)
         self._init_kwargs = init_kwargs
         self._define_metric_cfg = define_metric_cfg
@@ -395,14 +385,13 @@ class WandbVisBackend(BaseVisBackend):
         if not os.path.exists(self._save_dir):
             os.makedirs(self._save_dir, exist_ok=True)
         if self._init_kwargs is None:
-            self._init_kwargs = {'dir': self._save_dir}
+            self._init_kwargs = {"dir": self._save_dir}
         else:
-            self._init_kwargs.setdefault('dir', self._save_dir)
+            self._init_kwargs.setdefault("dir", self._save_dir)
         try:
             import wandb
         except ImportError:
-            raise ImportError(
-                'Please run "pip install wandb" to install wandb')
+            raise ImportError('Please run "pip install wandb" to install wandb')
 
         wandb.init(**self._init_kwargs)
         if self._define_metric_cfg is not None:
@@ -413,7 +402,7 @@ class WandbVisBackend(BaseVisBackend):
                 for metric_cfg in self._define_metric_cfg:
                     wandb.define_metric(**metric_cfg)
             else:
-                raise ValueError('define_metric_cfg should be dict or list')
+                raise ValueError("define_metric_cfg should be dict or list")
         self._wandb = wandb
 
     @property
@@ -435,14 +424,14 @@ class WandbVisBackend(BaseVisBackend):
             config (Config): The Config object
         """
         assert isinstance(self._init_kwargs, dict)
-        allow_val_change = self._init_kwargs.get('allow_val_change', False)
-        self._wandb.config.update(
-            dict(config), allow_val_change=allow_val_change)
+        allow_val_change = self._init_kwargs.get("allow_val_change", False)
+        self._wandb.config.update(dict(config), allow_val_change=allow_val_change)
         self._wandb.run.log_code(name=self._log_code_name)
 
     @force_init_env
-    def add_graph(self, model: torch.nn.Module, data_batch: Sequence[dict],
-                  **kwargs) -> None:
+    def add_graph(
+        self, model: torch.nn.Module, data_batch: Sequence[dict], **kwargs
+    ) -> None:
         """Record the model graph.
 
         Args:
@@ -452,11 +441,7 @@ class WandbVisBackend(BaseVisBackend):
         self._wandb.watch(model, **self._watch_kwargs)
 
     @force_init_env
-    def add_image(self,
-                  name: str,
-                  image: np.ndarray,
-                  step: int = 0,
-                  **kwargs) -> None:
+    def add_image(self, name: str, image: np.ndarray, step: int = 0, **kwargs) -> None:
         """Record the image to wandb.
 
         Args:
@@ -470,11 +455,13 @@ class WandbVisBackend(BaseVisBackend):
         self._wandb.log({name: image}, commit=self._commit)
 
     @force_init_env
-    def add_scalar(self,
-                   name: str,
-                   value: Union[int, float, torch.Tensor, np.ndarray],
-                   step: int = 0,
-                   **kwargs) -> None:
+    def add_scalar(
+        self,
+        name: str,
+        value: Union[int, float, torch.Tensor, np.ndarray],
+        step: int = 0,
+        **kwargs,
+    ) -> None:
         """Record the scalar data to wandb.
 
         Args:
@@ -486,11 +473,13 @@ class WandbVisBackend(BaseVisBackend):
         self._wandb.log({name: value}, commit=self._commit)
 
     @force_init_env
-    def add_scalars(self,
-                    scalar_dict: dict,
-                    step: int = 0,
-                    file_path: Optional[str] = None,
-                    **kwargs) -> None:
+    def add_scalars(
+        self,
+        scalar_dict: dict,
+        step: int = 0,
+        file_path: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Record the scalar's data to wandb.
 
         Args:
@@ -505,7 +494,7 @@ class WandbVisBackend(BaseVisBackend):
 
     def close(self) -> None:
         """close an opened wandb object."""
-        if hasattr(self, '_wandb'):
+        if hasattr(self, "_wandb"):
             self._wandb.join()
 
 
@@ -539,20 +528,22 @@ class TensorboardVisBackend(BaseVisBackend):
         """Setup env for Tensorboard."""
         if not os.path.exists(self._save_dir):
             os.makedirs(self._save_dir, exist_ok=True)
-        if TORCH_VERSION == 'parrots':
+        if TORCH_VERSION == "parrots":
             try:
                 from tensorboardX import SummaryWriter
             except ImportError:
-                raise ImportError('Please install tensorboardX to use '
-                                  'TensorboardLoggerHook.')
+                raise ImportError(
+                    "Please install tensorboardX to use " "TensorboardLoggerHook."
+                )
         else:
             try:
                 from torch.utils.tensorboard import SummaryWriter
             except ImportError:
                 raise ImportError(
                     'Please run "pip install future tensorboard" to install '
-                    'the dependencies to use torch.utils.tensorboard '
-                    '(applicable to PyTorch 1.1 or higher)')
+                    "the dependencies to use torch.utils.tensorboard "
+                    "(applicable to PyTorch 1.1 or higher)"
+                )
         self._tensorboard = SummaryWriter(self._save_dir)
 
     @property
@@ -568,14 +559,10 @@ class TensorboardVisBackend(BaseVisBackend):
         Args:
             config (Config): The Config object
         """
-        self._tensorboard.add_text('config', config.pretty_text)
+        self._tensorboard.add_text("config", config.pretty_text)
 
     @force_init_env
-    def add_image(self,
-                  name: str,
-                  image: np.ndarray,
-                  step: int = 0,
-                  **kwargs) -> None:
+    def add_image(self, name: str, image: np.ndarray, step: int = 0, **kwargs) -> None:
         """Record the image to tensorboard.
 
         Args:
@@ -584,14 +571,16 @@ class TensorboardVisBackend(BaseVisBackend):
                 should be RGB.
             step (int): Global step value to record. Defaults to 0.
         """
-        self._tensorboard.add_image(name, image, step, dataformats='HWC')
+        self._tensorboard.add_image(name, image, step, dataformats="HWC")
 
     @force_init_env
-    def add_scalar(self,
-                   name: str,
-                   value: Union[int, float, torch.Tensor, np.ndarray],
-                   step: int = 0,
-                   **kwargs) -> None:
+    def add_scalar(
+        self,
+        name: str,
+        value: Union[int, float, torch.Tensor, np.ndarray],
+        step: int = 0,
+        **kwargs,
+    ) -> None:
         """Record the scalar data to tensorboard.
 
         Args:
@@ -599,19 +588,22 @@ class TensorboardVisBackend(BaseVisBackend):
             value (int, float, torch.Tensor, np.ndarray): Value to save.
             step (int): Global step value to record. Defaults to 0.
         """
-        if isinstance(value,
-                      (int, float, torch.Tensor, np.ndarray, np.number)):
+        if isinstance(value, (int, float, torch.Tensor, np.ndarray, np.number)):
             self._tensorboard.add_scalar(name, value, step)
         else:
-            warnings.warn(f'Got {type(value)}, but numpy array, torch tensor, '
-                          f'int or float are expected. skip it!')
+            warnings.warn(
+                f"Got {type(value)}, but numpy array, torch tensor, "
+                f"int or float are expected. skip it!"
+            )
 
     @force_init_env
-    def add_scalars(self,
-                    scalar_dict: dict,
-                    step: int = 0,
-                    file_path: Optional[str] = None,
-                    **kwargs) -> None:
+    def add_scalars(
+        self,
+        scalar_dict: dict,
+        step: int = 0,
+        file_path: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Record the scalar's data to tensorboard.
 
         Args:
@@ -622,14 +614,15 @@ class TensorboardVisBackend(BaseVisBackend):
                 interface unification. Defaults to None.
         """
         assert isinstance(scalar_dict, dict)
-        assert 'step' not in scalar_dict, 'Please set it directly ' \
-                                          'through the step parameter'
+        assert "step" not in scalar_dict, (
+            "Please set it directly " "through the step parameter"
+        )
         for key, value in scalar_dict.items():
             self.add_scalar(key, value, step)
 
     def close(self):
         """close an opened tensorboard object."""
-        if hasattr(self, '_tensorboard'):
+        if hasattr(self, "_tensorboard"):
             self._tensorboard.close()
 
 
@@ -667,19 +660,19 @@ class MLflowVisBackend(BaseVisBackend):
         tracked_config_keys (dict, optional): The top level keys of config that
             will be added to the experiment. If it is None, which means all
             the config will be added. Defaults to None.
-            `New in version 0.7.4.`
     """
 
-    def __init__(self,
-                 save_dir: str,
-                 exp_name: Optional[str] = None,
-                 run_name: Optional[str] = None,
-                 tags: Optional[dict] = None,
-                 params: Optional[dict] = None,
-                 tracking_uri: Optional[str] = None,
-                 artifact_suffix: SUFFIX_TYPE = ('.json', '.log', '.py',
-                                                 'yaml'),
-                 tracked_config_keys: Optional[dict] = None):
+    def __init__(
+        self,
+        save_dir: str,
+        exp_name: Optional[str] = None,
+        run_name: Optional[str] = None,
+        tags: Optional[dict] = None,
+        params: Optional[dict] = None,
+        tracking_uri: Optional[str] = None,
+        artifact_suffix: SUFFIX_TYPE = (".json", ".log", ".py", "yaml"),
+        tracked_config_keys: Optional[dict] = None,
+    ):
         super().__init__(save_dir)
         self._exp_name = exp_name
         self._run_name = run_name
@@ -697,32 +690,29 @@ class MLflowVisBackend(BaseVisBackend):
         try:
             import mlflow
         except ImportError:
-            raise ImportError(
-                'Please run "pip install mlflow" to install mlflow'
-            )
+            raise ImportError('Please run "pip install mlflow" to install mlflow')
         self._mlflow = mlflow
 
         # when mlflow is imported, a default logger is created.
         # at this time, the default logger's stream is None
         # so the stream is reopened only when the stream is None
         # or the stream is closed
-        logger = MMLogger.get_current_instance()
+        logger = GLogger.get_current_instance()
         for handler in logger.handlers:
             if handler.stream is None or handler.stream.closed:
-                handler.stream = open(handler.baseFilename, 'a')
+                handler.stream = open(handler.baseFilename, "a")
 
         if self._tracking_uri is not None:
-            logger.warning(
-                'Please make sure that the mlflow server is running.')
+            logger.warning("Please make sure that the mlflow server is running.")
             self._mlflow.set_tracking_uri(self._tracking_uri)
         else:
-            if os.name == 'nt':
-                file_url = f'file:\\{os.path.abspath(self._save_dir)}'
+            if os.name == "nt":
+                file_url = f"file:\\{os.path.abspath(self._save_dir)}"
             else:
-                file_url = f'file://{os.path.abspath(self._save_dir)}'
+                file_url = f"file://{os.path.abspath(self._save_dir)}"
             self._mlflow.set_tracking_uri(file_url)
 
-        self._exp_name = self._exp_name or 'Default'
+        self._exp_name = self._exp_name or "Default"
 
         if self._mlflow.get_experiment_by_name(self._exp_name) is None:
             self._mlflow.create_experiment(self._exp_name)
@@ -730,7 +720,7 @@ class MLflowVisBackend(BaseVisBackend):
         self._mlflow.set_experiment(self._exp_name)
 
         if self._run_name is not None:
-            self._mlflow.set_tag('mlflow.runName', self._run_name)
+            self._mlflow.set_tag("mlflow.runName", self._run_name)
         if self._tags is not None:
             self._mlflow.set_tags(self._tags)
         if self._params is not None:
@@ -757,14 +747,10 @@ class MLflowVisBackend(BaseVisBackend):
             for k in self._tracked_config_keys:
                 tracked_cfg[k] = self.cfg[k]
             self._mlflow.log_params(self._flatten(tracked_cfg))
-        self._mlflow.log_text(self.cfg.pretty_text, 'config.py')
+        self._mlflow.log_text(self.cfg.pretty_text, "config.py")
 
     @force_init_env
-    def add_image(self,
-                  name: str,
-                  image: np.ndarray,
-                  step: int = 0,
-                  **kwargs) -> None:
+    def add_image(self, name: str, image: np.ndarray, step: int = 0, **kwargs) -> None:
         """Record the image to mlflow.
 
         Args:
@@ -776,11 +762,13 @@ class MLflowVisBackend(BaseVisBackend):
         self._mlflow.log_image(image, name)
 
     @force_init_env
-    def add_scalar(self,
-                   name: str,
-                   value: Union[int, float, torch.Tensor, np.ndarray],
-                   step: int = 0,
-                   **kwargs) -> None:
+    def add_scalar(
+        self,
+        name: str,
+        value: Union[int, float, torch.Tensor, np.ndarray],
+        step: int = 0,
+        **kwargs,
+    ) -> None:
         """Record the scalar data to mlflow.
 
         Args:
@@ -791,11 +779,13 @@ class MLflowVisBackend(BaseVisBackend):
         self._mlflow.log_metric(name, value, step)
 
     @force_init_env
-    def add_scalars(self,
-                    scalar_dict: dict,
-                    step: int = 0,
-                    file_path: Optional[str] = None,
-                    **kwargs) -> None:
+    def add_scalars(
+        self,
+        scalar_dict: dict,
+        step: int = 0,
+        file_path: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Record the scalar's data to mlflow.
 
         Args:
@@ -806,18 +796,18 @@ class MLflowVisBackend(BaseVisBackend):
                 interface unification. Defaults to None.
         """
         assert isinstance(scalar_dict, dict)
-        assert 'step' not in scalar_dict, 'Please set it directly ' \
-                                          'through the step parameter'
+        assert "step" not in scalar_dict, (
+            "Please set it directly " "through the step parameter"
+        )
         self._mlflow.log_metrics(scalar_dict, step)
 
     def close(self) -> None:
         """Close the mlflow."""
-        if not hasattr(self, '_mlflow'):
+        if not hasattr(self, "_mlflow"):
             return
 
         file_paths = dict()
-        for filename in scandir(self.cfg.work_dir, self._artifact_suffix,
-                                True):
+        for filename in scandir(self.cfg.work_dir, self._artifact_suffix, True):
             file_path = osp.join(self.cfg.work_dir, filename)
             relative_path = os.path.relpath(file_path, self.cfg.work_dir)
             dir_path = os.path.dirname(relative_path)
@@ -828,7 +818,7 @@ class MLflowVisBackend(BaseVisBackend):
 
         self._mlflow.end_run()
 
-    def _flatten(self, d, parent_key='', sep='.') -> dict:
+    def _flatten(self, d, parent_key="", sep=".") -> dict:
         """Flatten the dict."""
         items = dict()
         for k, v in d.items():
@@ -838,8 +828,7 @@ class MLflowVisBackend(BaseVisBackend):
             elif isinstance(v, list):
                 if any(isinstance(x, dict) for x in v):
                     for i, x in enumerate(v):
-                        items.update(
-                            self._flatten(x, new_key + sep + str(i), sep=sep))
+                        items.update(self._flatten(x, new_key + sep + str(i), sep=sep))
                 else:
                     items[new_key] = v
             else:
@@ -880,10 +869,12 @@ class ClearMLVisBackend(BaseVisBackend):
         https://clear.ml/docs/latest/docs/references/sdk/task/#taskinit
     """
 
-    def __init__(self,
-                 save_dir: Optional[str] = None,
-                 init_kwargs: Optional[dict] = None,
-                 artifact_suffix: SUFFIX_TYPE = ('.py', '.pth')):
+    def __init__(
+        self,
+        save_dir: Optional[str] = None,
+        init_kwargs: Optional[dict] = None,
+        artifact_suffix: SUFFIX_TYPE = (".py", ".pth"),
+    ):
         super().__init__(save_dir)
         self._init_kwargs = init_kwargs
         self._artifact_suffix = artifact_suffix
@@ -892,8 +883,7 @@ class ClearMLVisBackend(BaseVisBackend):
         try:
             import clearml
         except ImportError:
-            raise ImportError(
-                'Please run "pip install clearml" to install clearml')
+            raise ImportError('Please run "pip install clearml" to install clearml')
 
         task_kwargs = self._init_kwargs or {}
         self._clearml = clearml
@@ -917,11 +907,7 @@ class ClearMLVisBackend(BaseVisBackend):
         self._task.connect_configuration(vars(config))
 
     @force_init_env
-    def add_image(self,
-                  name: str,
-                  image: np.ndarray,
-                  step: int = 0,
-                  **kwargs) -> None:
+    def add_image(self, name: str, image: np.ndarray, step: int = 0, **kwargs) -> None:
         """Record the image to clearml.
 
         Args:
@@ -930,15 +916,16 @@ class ClearMLVisBackend(BaseVisBackend):
                 should be RGB.
             step (int): Global step value to record. Defaults to 0.
         """
-        self._logger.report_image(
-            title=name, series=name, iteration=step, image=image)
+        self._logger.report_image(title=name, series=name, iteration=step, image=image)
 
     @force_init_env
-    def add_scalar(self,
-                   name: str,
-                   value: Union[int, float, torch.Tensor, np.ndarray],
-                   step: int = 0,
-                   **kwargs) -> None:
+    def add_scalar(
+        self,
+        name: str,
+        value: Union[int, float, torch.Tensor, np.ndarray],
+        step: int = 0,
+        **kwargs,
+    ) -> None:
         """Record the scalar data to clearml.
 
         Args:
@@ -946,15 +933,16 @@ class ClearMLVisBackend(BaseVisBackend):
             value (int, float, torch.Tensor, np.ndarray): Value to save.
             step (int): Global step value to record. Defaults to 0.
         """
-        self._logger.report_scalar(
-            title=name, series=name, value=value, iteration=step)
+        self._logger.report_scalar(title=name, series=name, value=value, iteration=step)
 
     @force_init_env
-    def add_scalars(self,
-                    scalar_dict: dict,
-                    step: int = 0,
-                    file_path: Optional[str] = None,
-                    **kwargs) -> None:
+    def add_scalars(
+        self,
+        scalar_dict: dict,
+        step: int = 0,
+        file_path: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Record the scalar's data to clearml.
 
         Args:
@@ -964,22 +952,22 @@ class ClearMLVisBackend(BaseVisBackend):
             file_path (str, optional): Useless parameter. Just for
                 interface unification. Defaults to None.
         """
-        assert 'step' not in scalar_dict, 'Please set it directly ' \
-                                          'through the step parameter'
+        assert "step" not in scalar_dict, (
+            "Please set it directly " "through the step parameter"
+        )
         for key, value in scalar_dict.items():
             self._logger.report_scalar(
-                title=key, series=key, value=value, iteration=step)
+                title=key, series=key, value=value, iteration=step
+            )
 
     def close(self) -> None:
         """Close the clearml."""
-        if not hasattr(self, '_clearml'):
+        if not hasattr(self, "_clearml"):
             return
 
         file_paths: List[str] = list()
-        if (hasattr(self, 'cfg')
-                and osp.isdir(getattr(self.cfg, 'work_dir', ''))):
-            for filename in scandir(self.cfg.work_dir, self._artifact_suffix,
-                                    False):
+        if hasattr(self, "cfg") and osp.isdir(getattr(self.cfg, "work_dir", "")):
+            for filename in scandir(self.cfg.work_dir, self._artifact_suffix, False):
                 file_path = osp.join(self.cfg.work_dir, filename)
                 file_paths.append(file_path)
 

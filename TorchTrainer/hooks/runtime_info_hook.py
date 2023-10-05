@@ -1,4 +1,3 @@
-
 from typing import Any, Dict, Optional, Union
 
 import numpy as np
@@ -39,7 +38,7 @@ class RuntimeInfoHook(Hook):
     information through the message hub.
     """
 
-    priority = 'VERY_HIGH'
+    priority = "VERY_HIGH"
 
     def before_run(self, runner) -> None:
         """Update metainfo.
@@ -51,7 +50,8 @@ class RuntimeInfoHook(Hook):
             cfg=runner.cfg.pretty_text,
             seed=runner.seed,
             experiment_name=runner.experiment_name,
-            TorchTrainer_version=__version__ + get_git_hash())
+            TorchTrainer_version=__version__ + get_git_hash(),
+        )
         runner.message_hub.update_info_dict(metainfo)
 
     def before_train(self, runner) -> None:
@@ -60,13 +60,14 @@ class RuntimeInfoHook(Hook):
         Args:
             runner (Runner): The runner of the training process.
         """
-        runner.message_hub.update_info('epoch', runner.epoch)
-        runner.message_hub.update_info('iter', runner.iter)
-        runner.message_hub.update_info('max_epochs', runner.max_epochs)
-        runner.message_hub.update_info('max_iters', runner.max_iters)
-        if hasattr(runner.train_dataloader.dataset, 'metainfo'):
+        runner.message_hub.update_info("epoch", runner.epoch)
+        runner.message_hub.update_info("iter", runner.iter)
+        runner.message_hub.update_info("max_epochs", runner.max_epochs)
+        runner.message_hub.update_info("max_iters", runner.max_iters)
+        if hasattr(runner.train_dataloader.dataset, "metainfo"):
             runner.message_hub.update_info(
-                'dataset_meta', runner.train_dataloader.dataset.metainfo)
+                "dataset_meta", runner.train_dataloader.dataset.metainfo
+            )
 
     def before_train_epoch(self, runner) -> None:
         """Update current epoch information before every epoch.
@@ -74,12 +75,11 @@ class RuntimeInfoHook(Hook):
         Args:
             runner (Runner): The runner of the training process.
         """
-        runner.message_hub.update_info('epoch', runner.epoch)
+        runner.message_hub.update_info("epoch", runner.epoch)
 
-    def before_train_iter(self,
-                          runner,
-                          batch_idx: int,
-                          data_batch: DATA_BATCH = None) -> None:
+    def before_train_iter(
+        self, runner, batch_idx: int, data_batch: DATA_BATCH = None
+    ) -> None:
         """Update current iter and learning rate information before every
         iteration.
 
@@ -89,23 +89,26 @@ class RuntimeInfoHook(Hook):
             data_batch (Sequence[dict], optional): Data from dataloader.
                 Defaults to None.
         """
-        runner.message_hub.update_info('iter', runner.iter)
+        runner.message_hub.update_info("iter", runner.iter)
         lr_dict = runner.optim_wrapper.get_lr()
         assert isinstance(lr_dict, dict), (
-            '`runner.optim_wrapper.get_lr()` should return a dict '
-            'of learning rate when training with OptimWrapper(single '
-            'optimizer) or OptimWrapperDict(multiple optimizer), '
-            f'but got {type(lr_dict)} please check your optimizer '
-            'constructor return an `OptimWrapper` or `OptimWrapperDict` '
-            'instance')
+            "`runner.optim_wrapper.get_lr()` should return a dict "
+            "of learning rate when training with OptimWrapper(single "
+            "optimizer) or OptimWrapperDict(multiple optimizer), "
+            f"but got {type(lr_dict)} please check your optimizer "
+            "constructor return an `OptimWrapper` or `OptimWrapperDict` "
+            "instance"
+        )
         for name, lr in lr_dict.items():
-            runner.message_hub.update_scalar(f'train/{name}', lr[0])
+            runner.message_hub.update_scalar(f"train/{name}", lr[0])
 
-    def after_train_iter(self,
-                         runner,
-                         batch_idx: int,
-                         data_batch: DATA_BATCH = None,
-                         outputs: Optional[dict] = None) -> None:
+    def after_train_iter(
+        self,
+        runner,
+        batch_idx: int,
+        data_batch: DATA_BATCH = None,
+        outputs: Optional[dict] = None,
+    ) -> None:
         """Update ``log_vars`` in model outputs every iteration.
 
         Args:
@@ -117,11 +120,11 @@ class RuntimeInfoHook(Hook):
         """
         if outputs is not None:
             for key, value in outputs.items():
-                runner.message_hub.update_scalar(f'train/{key}', value)
+                runner.message_hub.update_scalar(f"train/{key}", value)
 
-    def after_val_epoch(self,
-                        runner,
-                        metrics: Optional[Dict[str, float]] = None) -> None:
+    def after_val_epoch(
+        self, runner, metrics: Optional[Dict[str, float]] = None
+    ) -> None:
         """All subclasses should override this method, if they need any
         operations after each validation epoch.
 
@@ -134,13 +137,13 @@ class RuntimeInfoHook(Hook):
         if metrics is not None:
             for key, value in metrics.items():
                 if _is_scalar(value):
-                    runner.message_hub.update_scalar(f'val/{key}', value)
+                    runner.message_hub.update_scalar(f"val/{key}", value)
                 else:
-                    runner.message_hub.update_info(f'val/{key}', value)
+                    runner.message_hub.update_info(f"val/{key}", value)
 
-    def after_test_epoch(self,
-                         runner,
-                         metrics: Optional[Dict[str, float]] = None) -> None:
+    def after_test_epoch(
+        self, runner, metrics: Optional[Dict[str, float]] = None
+    ) -> None:
         """All subclasses should override this method, if they need any
         operations after each test epoch.
 
@@ -153,6 +156,6 @@ class RuntimeInfoHook(Hook):
         if metrics is not None:
             for key, value in metrics.items():
                 if _is_scalar(value):
-                    runner.message_hub.update_scalar(f'test/{key}', value)
+                    runner.message_hub.update_scalar(f"test/{key}", value)
                 else:
-                    runner.message_hub.update_info(f'test/{key}', value)
+                    runner.message_hub.update_info(f"test/{key}", value)

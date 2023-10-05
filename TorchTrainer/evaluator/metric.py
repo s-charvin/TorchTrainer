@@ -24,28 +24,10 @@ from typing import List, Optional, Sequence, Union
 
 
 class BaseMetric(metaclass=ABCMeta):
-    """Base class for a metric.
-
-    The metric first processes each batch of data_samples and predictions,
-    and appends the processed results to the results list. Then it
-    collects all results together from all ranks if distributed training
-    is used. Finally, it computes the metrics of the entire dataset.
-
-    A subclass of class:`BaseMetric` should assign a meaningful value to the
-    class attribute `default_prefix`. See the argument `prefix` for details.
-
-    Args:
-        collect_device (str): Device name used for collecting results from
-            different ranks during distributed training. Must be 'cpu' or
-            'gpu'. Defaults to 'cpu'.
-        prefix (str, optional): The prefix that will be added in the metric
-            names to disambiguate homonymous metrics of different evaluators.
-            If prefix is not provided in the argument, self.default_prefix
-            will be used instead. Default: None
-        collect_dir: (str, optional): Synchronize directory for collecting data
-            from different ranks. This argument should only be configured when
-            ``collect_device`` is 'cpu'. Defaults to None.
-            `New in version 0.7.3.`
+    """评估结果(metric)的基类
+        - 该度量首先处理每个数据样本和预测的批次, 并将处理结果追加到结果列表中. 然后, 如果使用分布式训练, 则从所有排名中收集所有结果. 最后, 计算整个数据集的指标. 
+        - 继承自 :class:`BaseMetric` 的子类应该通过 'prefix' 参数为 'default_prefix' 属性分配一个有意义的值, 以区分不同评估器的同名指标.
+        - 继承自 :class:`BaseMetric` 的子类应该实现 ``process`` 函数将处理后的结果存储在 ``self.results`` 中, 然后实现 ``compute_metrics`` 方法, 以便在处理完所有批次后计算指标.
     """
 
     default_prefix: Optional[str] = None
@@ -109,8 +91,7 @@ class BaseMetric(metaclass=ABCMeta):
         """
 
     def evaluate(self, size: int) -> dict:
-        """Evaluate the model performance of the whole dataset after processing
-        all batches.
+        """在处理完所有批次后, 评估模型在整个验证数据集的性能
 
         Args:
             size (int): Length of the entire validation dataset. When batch
@@ -120,8 +101,7 @@ class BaseMetric(metaclass=ABCMeta):
                 this size.
 
         Returns:
-            dict: Evaluation metrics dict on the val dataset. The keys are the
-            names of the metrics, and the values are corresponding results.
+            dict: 验证数据集上的评估指标字典. key 是指标名称, value 是相应结果.
         """
         if len(self.results) == 0:
             print_log(
@@ -259,7 +239,7 @@ class Accuracy(BaseMetric):
     r"""用于单标签或多标签分类任务的准确性评估, 包含 top-k 准确度.
 
     Args:
-        topk (int | Sequence[int]): 如果真实标签与最佳的 k 个预测之一匹配, 则将该样本视为正确预测。如果参数是元组, 则所有 top-k 准确度都将被计算并一起输出. 默认值为 1.
+        topk (int | Sequence[int]): 如果真实标签与最佳的 k 个预测之一匹配, 则将该样本视为正确预测. 如果参数是元组, 则所有 top-k 准确度都将被计算并一起输出. 默认值为 1.
         thrs (Sequence[float | None] | float | None): 设置预测阈值. 如果是浮点数, 低于 thrs 值的预测被认为是错误预测的. None 意味着没有门槛. 如果是元组, 则将基于所有阈值计算并一起输出准确性. 默认为 0.
         collect_device (str): 设置在分布式训练期间收集不同训练进程中结果的设备类型. 必须是 "cpu" 或"gpu". 默认为 "cpu".
         prefix (str, optional): 将 prefix 添加到评估名称中, 避免不同评估器同名. 默认为 None, 使用 self.default_prefix.
@@ -386,7 +366,7 @@ class SingleLabelMetric(BaseMetric):
 
     Args:
         thrs (Sequence[float | None] | float | None): 设置预测阈值. 如果是浮点数, 低于 thrs 值的预测被认为是错误预测的. None 意味着没有门槛. 如果是元组, 则将基于所有阈值计算并一起输出准确性. 默认为 0.
-        items (Sequence[str]): 指定需要的评估指标， 默认为 ``('precision', 'recall', 'f1-score')``. 还支持 "support" .
+        items (Sequence[str]): 指定需要的评估指标,  默认为 ``('precision', 'recall', 'f1-score')``. 还支持 "support" .
         average (str | None): 设置混淆矩阵的计算模式, 默认为 "macro".
             - `"macro"`: 为每个类别计算指标, 并计算所有类别的平均值.
             - `"micro"`: 对所有类别进行混淆矩阵平均化, 并在平均混淆矩阵上计算指标.

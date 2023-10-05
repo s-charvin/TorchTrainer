@@ -1,4 +1,4 @@
-# Copyright (c) OpenMMLab. All rights reserved.
+
 import warnings
 from typing import Optional, Union
 from pathlib import Path
@@ -193,8 +193,6 @@ class LoadImageFromFile(BaseTransform):
         self.to_float32 = to_float32
         self.color_type = color_type
         self.decode_backend = decode_backend
-
-        self.file_client_args: Optional[dict] = None
         self.backend_args: Optional[dict] = None
 
         self.backend_args = backend_args.copy()
@@ -231,10 +229,8 @@ class LoadImageFromFile(BaseTransform):
             f"imdecode_backend='{self.decode_backend}', "
         )
 
-        if self.file_client_args is not None:
-            repr_str += f"file_client_args={self.file_client_args})"
-        else:
-            repr_str += f"backend_args={self.backend_args})"
+
+        repr_str += f"backend_args={self.backend_args})"
 
         return repr_str
 
@@ -286,7 +282,7 @@ class LoadMultiChannelImageFromFiles(BaseTransform):
                 )
             img = np.stack(img, axis=-1)
 
-            assert img is not None, f"failed to load image。"
+            assert img is not None, f"failed to load image. "
             if self.to_float32:
                 img = img.astype(np.float32)
             results[filekey.replace("img_path", "img_data")] = img

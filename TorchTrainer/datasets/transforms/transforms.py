@@ -1,4 +1,4 @@
-# Copyright (c) OpenMMLab. All rights reserved.
+
 import warnings
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 import copy
@@ -212,12 +212,7 @@ class NormalizeImage(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                data[i] = imnormalize(data[i], self.mean, self.std, self.to_rgb)
-            results[key] = data
+            results[key] = imnormalize(results[key], self.mean, self.std, self.to_rgb)
             results[f"norm_{key}_cfg"] = dict(
                 mean=self.mean, std=self.std, to_rgb=self.to_rgb
             )
@@ -258,13 +253,8 @@ class NormalizeVideo(BaseTransform):
 
         for key in self.keys:
             data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                for j in range(len(data[i])):
-                    data[i][j] = imnormalize(
-                        data[i][j], self.mean, self.std, self.to_rgb
-                    )
+            for j in range(len(data)):
+                data[j] = imnormalize(data[j], self.mean, self.std, self.to_rgb)
             results[key] = data
             results[f"norm_{key}_cfg"] = dict(
                 mean=self.mean, std=self.std, to_rgb=self.to_rgb
@@ -334,65 +324,33 @@ class ResizeImage(BaseTransform):
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
             data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                if self.keep_ratio:
-                    img, scale_factor = imrescale(
-                        data[i],
-                        results["scale"],
-                        interpolation=self.interpolation,
-                        return_scale=True,
-                        backend=self.backend,
-                    )
-                    # the w_scale and h_scale has minor difference
-                    # a real fix should be done in the mmcv.imrescale in the future
-                    new_h, new_w = img.shape[:2]
-                    h, w = data[i].shape[:2]
-                    w_scale = new_w / w
-                    h_scale = new_h / h
-                else:
-                    img, w_scale, h_scale = imresize(
-                        data[i],
-                        results["scale"],
-                        interpolation=self.interpolation,
-                        return_scale=True,
-                        backend=self.backend,
-                    )
-                data[i] = img
 
-            results[key] = data
+            if self.keep_ratio:
+                results[key], scale_factor = imrescale(
+                    data,
+                    results["scale"],
+                    interpolation=self.interpolation,
+                    return_scale=True,
+                    backend=self.backend,
+                )
+                # the w_scale and h_scale has minor difference
+                # a real fix should be done in the mmcv.imrescale in the future
+                new_h, new_w = results[key].shape[:2]
+                h, w = data.shape[:2]
+                w_scale = new_w / w
+                h_scale = new_h / h
+            else:
+                results[key], w_scale, h_scale = imresize(
+                    data,
+                    results["scale"],
+                    interpolation=self.interpolation,
+                    return_scale=True,
+                    backend=self.backend,
+                )
+
             results[f"shape_{key}"] = data[0].shape[:2]
             results[f"scale_factor_{key}"] = (w_scale, h_scale)
             results[f"keep_ratio_{key}"] = self.keep_ratio
-
-            if results.get(key, None) is not None:
-                if self.keep_ratio:
-                    img, scale_factor = imrescale(
-                        results[key],
-                        results["scale"],
-                        interpolation=self.interpolation,
-                        return_scale=True,
-                        backend=self.backend,
-                    )
-                    # the w_scale and h_scale has minor difference
-                    # a real fix should be done in the mmcv.imrescale in the future
-                    new_h, new_w = img.shape[:2]
-                    h, w = results[key].shape[:2]
-                    w_scale = new_w / w
-                    h_scale = new_h / h
-                else:
-                    img, w_scale, h_scale = imresize(
-                        results[key],
-                        results["scale"],
-                        interpolation=self.interpolation,
-                        return_scale=True,
-                        backend=self.backend,
-                    )
-                results[key] = img
-                results[f"shape_{key}"] = img.shape[:2]
-                results[f"scale_factor_{key}"] = (w_scale, h_scale)
-                results[f"keep_ratio_{key}"] = self.keep_ratio
 
     def transform(self, results: dict) -> dict:
         """Transform function to resize images."""
@@ -473,33 +431,31 @@ class ResizeVideo(BaseTransform):
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
             data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                for j in range(len(data[i])):
-                    if self.keep_ratio:
-                        img, scale_factor = imrescale(
-                            data[i][j],
-                            results["scale"],
-                            interpolation=self.interpolation,
-                            return_scale=True,
-                            backend=self.backend,
-                        )
-                        # the w_scale and h_scale has minor difference
-                        # a real fix should be done in the mmcv.imrescale in the future
-                        new_h, new_w = img.shape[:2]
-                        h, w = data[i][j].shape[:2]
-                        w_scale = new_w / w
-                        h_scale = new_h / h
-                    else:
-                        img, w_scale, h_scale = imresize(
-                            data[i][j],
-                            results["scale"],
-                            interpolation=self.interpolation,
-                            return_scale=True,
-                            backend=self.backend,
-                        )
-                    data[i][j] = img
+
+            for j in range(len(data)):
+                if self.keep_ratio:
+                    img, scale_factor = imrescale(
+                        data[j],
+                        results["scale"],
+                        interpolation=self.interpolation,
+                        return_scale=True,
+                        backend=self.backend,
+                    )
+                    # the w_scale and h_scale has minor difference
+                    # a real fix should be done in the mmcv.imrescale in the future
+                    new_h, new_w = img.shape[:2]
+                    h, w = data[j].shape[:2]
+                    w_scale = new_w / w
+                    h_scale = new_h / h
+                else:
+                    img, w_scale, h_scale = imresize(
+                        data[j],
+                        results["scale"],
+                        interpolation=self.interpolation,
+                        return_scale=True,
+                        backend=self.backend,
+                    )
+                data[j] = img
 
             results[key] = data
             results[f"shape_{key}"] = results[key][0].shape[1:3]
@@ -660,19 +616,13 @@ class MFCC(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
             new_key = key.replace("audio_data", "mfcc_data")
-            results[new_key] = []
-            for i in range(len(data)):
-                mfcc = extract_mfcc(
-                    data[i],
-                    sample_rate=sample_rate,
-                    backend=self.backend,
-                    **self.kwargs,
-                )
-                results[new_key].append(mfcc)
+            results[new_key] = extract_mfcc(
+                results[key],
+                sample_rate=sample_rate,
+                backend=self.backend,
+                **self.kwargs,
+            )
             if self.override:
                 results.pop(key, None)
             results[f"mfcc_cfg_{key}"] = self.kwargs
@@ -727,14 +677,8 @@ class Fbank(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
             new_key = key.replace("audio_data", "fbank_data")
-            results[new_key] = []
-            for i in range(len(data)):
-                fbank = extract_fbank(data[i], self.backend, **self.kwargs)
-                results[new_key].append(fbank)
+            results[new_key] = extract_fbank(results[key], self.backend, **self.kwargs)
             if self.override:
                 results.pop(key, None)
             results[f"fbank_cfg_{key}"] = self.kwargs
@@ -850,19 +794,15 @@ class MelSpectrogram(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
+
             new_key = key.replace("audio_data", "mel_spectrogram_data")
-            results[new_key] = []
-            for i in range(len(data)):
-                mel_spectrogram = extract_mel_spectrogram(
-                    audio=data[i],
-                    sample_rate=sample_rate,
-                    backend=self.backend,
-                    **self.kwargs,
-                )
-                results[new_key].append(mel_spectrogram)
+
+            results[new_key] = extract_mel_spectrogram(
+                audio=results[key],
+                sample_rate=sample_rate,
+                backend=self.backend,
+                **self.kwargs,
+            )
             if self.override:
                 results.pop(key, None)
             results[f"mel_spectrogram_cfg_{key}"] = self.kwargs
@@ -907,23 +847,18 @@ class CropFrames(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                video = data[i]
-                video_len = len(video)
-                if video_len > self.sample_num:
-                    if self.mode == "random":
-                        start = np.random.randint(0, video_len - self.sample_num)
-                    elif self.mode == "center":
-                        start = (video_len - self.sample_num) // 2
-                    else:
-                        raise ValueError(f"Unsupported mode: {self.mode}")
+
+            video_len = len(results[key])
+            if video_len > self.sample_num:
+                if self.mode == "random":
+                    start = np.random.randint(0, video_len - self.sample_num)
+                elif self.mode == "center":
+                    start = (video_len - self.sample_num) // 2
                 else:
-                    start = 0
-                data[i] = video[start : start + self.sample_num]
-            results[key] = data
+                    raise ValueError(f"Unsupported mode: {self.mode}")
+            else:
+                start = 0
+            results[key] = results[key][start : start + self.sample_num]
         results[f"crop_frames_cfg_{key}"] = dict(
             sample_num=self.sample_num, mode=self.mode
         )
@@ -969,18 +904,13 @@ class ResampleAudio(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                audio = data[i]
-                audio = librosa.resample(
-                    audio,
-                    orig_sr=self.input_sample_rate,
-                    target_sr=self.output_sample_rate,
-                )
-                data[i] = audio
-            results[key] = data
+
+            results[key] = librosa.resample(
+                results[key],
+                orig_sr=self.input_sample_rate,
+                target_sr=self.output_sample_rate,
+            )
+
         results[f"resample_audio_cfg_{key}"] = dict(
             input_sample_rate=self.input_sample_rate,
             output_sample_rate=self.output_sample_rate,
@@ -1026,22 +956,17 @@ class ResampleVideo(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                video = data[i]
-                frame_count, height, width, _ = video.shape
-                output_frame_count = int(frame_count * self.output_fps / self.input_fps)
-                output_video_frames = cv2.resize(
-                    video,
-                    (width, height),
-                    fx=output_frame_count / frame_count,
-                    fy=1.0,
-                    interpolation=cv2.INTER_LINEAR,
-                )
-                data[i] = output_video_frames
-            results[key] = data
+
+            frame_count, height, width, _ = results[key].shape
+            output_frame_count = int(frame_count * self.output_fps / self.input_fps)
+            results[key] = cv2.resize(
+                results[key],
+                (width, height),
+                fx=output_frame_count / frame_count,
+                fy=1.0,
+                interpolation=cv2.INTER_LINEAR,
+            )
+
         results[f"resample_video_cfg_{key}"] = dict(
             input_fps=self.input_fps, output_fps=self.output_fps
         )
@@ -1090,36 +1015,27 @@ class TimeRandomSplit(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            data_list = []
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                data_len = data[i].shape[1]
-                total_nums = (
-                    int(np.ceil((data_len - self.win_length) / self.hop_length)) + 1
+
+            data_len = results[key].shape[1]
+            total_nums = (
+                int(np.ceil((data_len - self.win_length) / self.hop_length)) + 1
+            )
+
+            if total_nums > 1:
+                # 随机选择一个片段
+                num = np.random.randint(0, total_nums - 1)
+                start = num * self.hop_length
+                end = min(start + self.win_length, data_len)
+                results[key] = results[key][:, start:end]
+
+            elif total_nums == 1:
+                results[key] = np.pad(
+                    results[key],
+                    ((0, 0), (0, self.win_length - data_len)),
+                    mode="constant",
+                    constant_values=0,
                 )
 
-                if total_nums > 1:
-                    # 随机选择一个片段
-                    num = np.random.randint(0, total_nums-1)
-                    start = num * self.hop_length
-                    end = min(start + self.win_length, data_len)
-                    data_list.append(data[i][:, start:end])
-
-                    # for j in range(total_nums - 1):
-                    #     start = j * self.hop_length
-                    #     end = min(start + self.win_length, data_len)
-                    #     data_list.append(data[i][:, start:end])
-                elif total_nums == 1:
-                    data[i] = np.pad(
-                        data[i],
-                        ((0, 0), (0, self.win_length - data_len)),
-                        mode="constant",
-                        constant_values=0,
-                    )
-                    data_list.append(data[i])
-            results[key] = data_list
             results[f"split_{key}_cfg"] = dict(
                 win_length=self.win_length, hop_length=self.hop_length
             )
@@ -1160,50 +1076,46 @@ class PadCutAudio(BaseTransform):
         for key in self.keys:
             if results.get(key, None) is None:
                 raise KeyError(f"Can not find key {key}")
-            data = results[key]
-            if not isinstance(data, List):
-                data = [data]
-            for i in range(len(data)):
-                data_len = data[i].shape[1]
-                if data_len < self.sample_num:
-                    if self.pad_mode == "center":
-                        pad_left = (self.sample_num - data_len) // 2
-                        pad_right = self.sample_num - data_len - pad_left
-                    elif self.pad_mode == "left":
-                        pad_left = self.sample_num - data_len
-                        pad_right = 0
-                    elif self.pad_mode == "right":
-                        pad_left = 0
-                        pad_right = self.sample_num - data_len
-                    elif self.pad_mode == "random":
-                        pad_left = np.random.randint(0, self.sample_num - data_len)
-                        pad_right = self.sample_num - data_len - pad_left
-                    else:
-                        raise ValueError(f"Unsupported pad_mode: {self.pad_mode}")
-                    data[i] = np.pad(
-                        data[i],
-                        ((0, 0), (pad_left, pad_right)),
-                        mode=self.mode,
-                        constant_values=self.value,
-                    )
-                elif data_len > self.sample_num:
-                    if self.pad_mode == "center":
-                        cut_left = (data_len - self.sample_num) // 2
-                        cut_right = data_len - self.sample_num - cut_left
-                    elif self.pad_mode == "left":
-                        cut_left = data_len - self.sample_num
-                        cut_right = 0
-                    elif self.pad_mode == "right":
-                        cut_left = 0
-                        cut_right = data_len - self.sample_num
-                    elif self.pad_mode == "random":
-                        cut_left = np.random.randint(0, data_len - self.sample_num)
-                        cut_right = data_len - self.sample_num - cut_left
-                    else:
-                        raise ValueError(f"Unsupported pad_mode: {self.pad_mode}")
-                    data[i] = data[i][:, cut_left : data_len - cut_right]
 
-            results[key] = data
+            data_len = results[key].shape[1]
+            if data_len < self.sample_num:
+                if self.pad_mode == "center":
+                    pad_left = (self.sample_num - data_len) // 2
+                    pad_right = self.sample_num - data_len - pad_left
+                elif self.pad_mode == "left":
+                    pad_left = self.sample_num - data_len
+                    pad_right = 0
+                elif self.pad_mode == "right":
+                    pad_left = 0
+                    pad_right = self.sample_num - data_len
+                elif self.pad_mode == "random":
+                    pad_left = np.random.randint(0, self.sample_num - data_len)
+                    pad_right = self.sample_num - data_len - pad_left
+                else:
+                    raise ValueError(f"Unsupported pad_mode: {self.pad_mode}")
+                results[key] = np.pad(
+                    results[key],
+                    ((0, 0), (pad_left, pad_right)),
+                    mode=self.mode,
+                    constant_values=self.value,
+                )
+            elif data_len > self.sample_num:
+                if self.pad_mode == "center":
+                    cut_left = (data_len - self.sample_num) // 2
+                    cut_right = data_len - self.sample_num - cut_left
+                elif self.pad_mode == "left":
+                    cut_left = data_len - self.sample_num
+                    cut_right = 0
+                elif self.pad_mode == "right":
+                    cut_left = 0
+                    cut_right = data_len - self.sample_num
+                elif self.pad_mode == "random":
+                    cut_left = np.random.randint(0, data_len - self.sample_num)
+                    cut_right = data_len - self.sample_num - cut_left
+                else:
+                    raise ValueError(f"Unsupported pad_mode: {self.pad_mode}")
+                results[key] = results[key][:, cut_left : data_len - cut_right]
+
             results[f"pad_{key}_cfg"] = dict(
                 padding=self.pad_mode, mode=self.mode, value=self.value
             )

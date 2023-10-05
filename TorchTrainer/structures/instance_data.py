@@ -31,7 +31,7 @@ class InstanceData(BaseDataElement):
     BaseDataElement 的子类. `data_fields`中所有值应具有相同的长度.
 
     数据字段中值的类型可以是基本数据结构, 例如'torch.Tensor'、'numpy.ndarray'、'list'、 'str'、 'tuple', 
-    也可以是自定义数据结构, 该自定义数据结构具有 “__len__”、“__getitem__” 和 “cat” 属性。
+    也可以是自定义数据结构, 该自定义数据结构具有 “__len__”、“__getitem__” 和 “cat” 属性. 
     """
 
     def __setattr__(self, name: str, value: Sized):

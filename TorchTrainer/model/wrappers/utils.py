@@ -1,24 +1,10 @@
-
 import torch.nn as nn
 
 from TorchTrainer.utils.registry import MODEL_WRAPPERS, Registry
 
 
 def is_model_wrapper(model: nn.Module, registry: Registry = MODEL_WRAPPERS):
-    """Check if a module is a model wrapper.
-
-    The following 4 model in TorchTrainer (and their subclasses) are regarded as
-    model wrappers: DataParallel, DistributedDataParallel,
-    MMDataParallel, MMDistributedDataParallel. You may add you own
-    model wrapper by registering it to ``TorchTrainer.registry.MODEL_WRAPPERS``.
-
-    Args:
-        model (nn.Module): The model to be checked.
-        registry (Registry): The parent registry to search for model wrappers.
-
-    Returns:
-        bool: True if the input model is a model wrapper.
-    """
+    """检查一个模块是否是一个模型包装器, 例如 ``DataParallel``, ``DistributedDataParallel``, ``TTDataParallel``, ``TTDistributedDataParallel``."""
     module_wrappers = tuple(registry.module_dict.values())
     if isinstance(model, module_wrappers):
         return True
@@ -26,5 +12,4 @@ def is_model_wrapper(model: nn.Module, registry: Registry = MODEL_WRAPPERS):
     if not registry.children:
         return False
 
-    return any(
-        is_model_wrapper(model, child) for child in registry.children.values())
+    return any(is_model_wrapper(model, child) for child in registry.children.values())

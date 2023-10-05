@@ -1,4 +1,3 @@
-
 import logging
 import random
 from typing import List, Optional, Tuple
@@ -13,8 +12,7 @@ from TorchTrainer.utils.dl_utils import TORCH_VERSION
 
 
 def calc_dynamic_intervals(
-    start_interval: int,
-    dynamic_interval_list: Optional[List[Tuple[int, int]]] = None
+    start_interval: int, dynamic_interval_list: Optional[List[Tuple[int, int]]] = None
 ) -> Tuple[List[int], List[int]]:
     """Calculate dynamic intervals.
 
@@ -36,16 +34,20 @@ def calc_dynamic_intervals(
 
     dynamic_milestones = [0]
     dynamic_milestones.extend(
-        [dynamic_interval[0] for dynamic_interval in dynamic_interval_list])
+        [dynamic_interval[0] for dynamic_interval in dynamic_interval_list]
+    )
     dynamic_intervals = [start_interval]
     dynamic_intervals.extend(
-        [dynamic_interval[1] for dynamic_interval in dynamic_interval_list])
+        [dynamic_interval[1] for dynamic_interval in dynamic_interval_list]
+    )
     return dynamic_milestones, dynamic_intervals
 
 
-def set_random_seed(seed: Optional[int] = None,
-                    deterministic: bool = False,
-                    diff_rank_seed: bool = False) -> int:
+def set_random_seed(
+    seed: Optional[int] = None,
+    deterministic: bool = False,
+    diff_rank_seed: bool = False,
+) -> int:
     """Set random seed.
 
     Args:
@@ -73,14 +75,15 @@ def set_random_seed(seed: Optional[int] = None,
     if deterministic:
         if torch.backends.cudnn.benchmark:
             print_log(
-                'torch.backends.cudnn.benchmark is going to be set as '
-                '`False` to cause cuDNN to deterministically select an '
-                'algorithm',
-                logger='current',
-                level=logging.WARNING)
+                "torch.backends.cudnn.benchmark is going to be set as "
+                "`False` to cause cuDNN to deterministically select an "
+                "algorithm",
+                logger="current",
+                level=logging.WARNING,
+            )
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-        if digit_version(TORCH_VERSION) >= digit_version('1.10.0'):
+        if digit_version(TORCH_VERSION) >= digit_version("1.10.0"):
             torch.use_deterministic_algorithms(True)
     return seed

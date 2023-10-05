@@ -15,18 +15,12 @@ def stack_batch(
     pad_size_divisor: int = 1,
     pad_value: Union[int, float] = 0,
 ) -> torch.Tensor:
-    """Stack multiple tensors to form a batch and pad the tensor to the max
-    shape use the right bottom padding mode in these images. If
-    ``pad_size_divisor > 0``, add padding to ensure the shape of each dim is
-    divisible by ``pad_size_divisor``.
+    """将多个张量堆叠成一个批次, 并使用右下角填充模式对张量进行填充, 以达到最大形状.  如果``pad_size_divisor > 0``, 则添加填充以确保每个维度的形状可被``pad_size_divisor``整除.
 
     Args:
-        tensor_list (List[Tensor]): A list of tensors with the same dim.
-        pad_size_divisor (int): If ``pad_size_divisor > 0``, add padding
-            to ensure the shape of each dim is divisible by
-            ``pad_size_divisor``. This depends on the model, and many
-            models need to be divisible by 32. Defaults to 1
-        pad_value (int, float): The padding value. Defaults to 0.
+        tensor_list (List[Tensor]): 具有相同维度的张量列表.
+        pad_size_divisor (int): 则添加填充以确保每个维度的形状可被 ``pad_size_divisor`` 整除.  Defaults to 1
+        pad_value (int, float): 填充值.  Defaults to 0.
 
     Returns:
        Tensor: The n dim tensor.
@@ -93,24 +87,7 @@ def detect_anomalous_params(loss: torch.Tensor, model) -> None:
 
 
 def merge_dict(*args):
-    """Merge all dictionaries into one dictionary.
-
-    If pytorch version >= 1.8, ``merge_dict`` will be wrapped
-    by ``torch.fx.wrap``,  which will make ``torch.fx.symbolic_trace`` skip
-    trace ``merge_dict``.
-
-    Note:
-        If a function needs to be traced by ``torch.fx.symbolic_trace``,
-        but inevitably needs to use ``update`` method of ``dict``(``update``
-        is not traceable). It should use ``merge_dict`` to replace
-        ``xxx.update``.
-
-    Args:
-        *args: dictionary needs to be merged.
-
-    Returns:
-        dict: Merged dict from args
-    """
+    """合并所有字典为一个字典"""
     output = dict()
     for item in args:
         assert isinstance(item, dict), (
@@ -120,11 +97,6 @@ def merge_dict(*args):
     return output
 
 
-# torch.fx is only available when pytorch version >= 1.8.
-# If the subclass of `BaseModel` has multiple submodules, and each module
-# will return a loss dict during training process, i.e., `TwoStageDetector`
-# in mmdet. It should use `merge_dict` to get the total loss, rather than
-# `loss.update` to keep model traceable.
 try:
     import torch.fx
 
@@ -139,41 +111,16 @@ except ImportError:
 
 
 class _BatchNormXd(nn.modules.batchnorm._BatchNorm):
-    """A general BatchNorm layer without input dimension check.
-
-    Reproduced from @kapily's work:
-    (https://github.com/pytorch/pytorch/issues/41081#issuecomment-783961547)
-    The only difference between BatchNorm1d, BatchNorm2d, BatchNorm3d, etc
-    is `_check_input_dim` that is designed for tensor sanity checks.
-    The check has been bypassed in this class for the convenience of converting
-    SyncBatchNorm.
-    """
+    """一个没有输入维度检查的通用 BatchNorm 层, 为了方便转换 SyncBatchNorm"""
 
     def _check_input_dim(self, input: torch.Tensor):
         return
 
 
 def revert_sync_batchnorm(module: nn.Module) -> nn.Module:
-    """Helper function to convert all `SyncBatchNorm` (SyncBN) and
-    `mmcv.ops.sync_bn.SyncBatchNorm`(MMSyncBN) layers in the model to
-    `BatchNormXd` layers.
-
-    Adapted from @kapily's work:
-    (https://github.com/pytorch/pytorch/issues/41081#issuecomment-783961547)
-
-    Args:
-        module (nn.Module): The module containing `SyncBatchNorm` layers.
-
-    Returns:
-        module_output: The converted module with `BatchNormXd` layers.
-    """
+    """辅助函数, 将模型中的所有 `SyncBatchNorm` 层转换为 `BatchNormXd` 层."""
     module_output = module
     module_checklist = [torch.nn.modules.batchnorm.SyncBatchNorm]
-
-    if mmcv_full_available():
-        from mmcv.ops import SyncBatchNorm
-
-        module_checklist.append(SyncBatchNorm)
 
     if isinstance(module, tuple(module_checklist)):
         module_output = _BatchNormXd(
@@ -184,8 +131,7 @@ def revert_sync_batchnorm(module: nn.Module) -> nn.Module:
             module.track_running_stats,
         )
         if module.affine:
-            # no_grad() may not be needed here but
-            # just to be consistent with `convert_sync_batchnorm()`
+            # no_grad() may not be needed here but just to be consistent with `convert_sync_batchnorm()`
             with torch.no_grad():
                 module_output.weight = module.weight
                 module_output.bias = module.bias
@@ -197,10 +143,7 @@ def revert_sync_batchnorm(module: nn.Module) -> nn.Module:
         if hasattr(module, "qconfig"):
             module_output.qconfig = module.qconfig
     for name, child in module.named_children():
-        # Some custom modules or 3rd party implemented modules may raise an
-        # error when calling `add_module`. Therefore, try to catch the error
-        # and do not raise it. See https://github.com/open-mmlab/TorchTrainer/issues/638
-        # for more details.
+        # 当调用`add_module`时, 一些自定义模块或第三方实现的模块可能会引发错误. 因此, 请尝试捕获该错误并不要抛出它. 
         try:
             module_output.add_module(name, revert_sync_batchnorm(child))
         except Exception:
@@ -214,30 +157,12 @@ def revert_sync_batchnorm(module: nn.Module) -> nn.Module:
 
 
 def convert_sync_batchnorm(module: nn.Module, implementation="torch") -> nn.Module:
-    """Helper function to convert all `BatchNorm` layers in the model to
-    `SyncBatchNorm` (SyncBN) or `mmcv.ops.sync_bn.SyncBatchNorm` (MMSyncBN)
-    layers. Adapted from `PyTorch convert sync batchnorm`_.
-
-    Args:
-        module (nn.Module): The module containing `SyncBatchNorm` layers.
-        implementation (str): The type of `SyncBatchNorm` to convert to.
-
-            - 'torch': convert to `torch.nn.modules.batchnorm.SyncBatchNorm`.
-            - 'mmcv': convert to `mmcv.ops.sync_bn.SyncBatchNorm`.
-
-    Returns:
-        nn.Module: The converted module with `SyncBatchNorm` layers.
-
-    .. _PyTorch convert sync batchnorm:
-       https://pytorch.org/docs/stable/generated/torch.nn.SyncBatchNorm.html#torch.nn.SyncBatchNorm.convert_sync_batchnorm
-    """
+    """辅助函数, 将模型中的所有 `BatchNorm` 层转换为 `SyncBatchNorm`."""
     module_output = module
 
     if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
         if implementation == "torch":
             SyncBatchNorm = torch.nn.modules.batchnorm.SyncBatchNorm
-        elif implementation == "mmcv":
-            from mmcv.ops import SyncBatchNorm
         else:
             raise ValueError(
                 'sync_bn should be "torch" or "mmcv", but got ' f"{implementation}"

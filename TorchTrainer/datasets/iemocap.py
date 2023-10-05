@@ -280,19 +280,19 @@ class IEMOCAP(BaseDataset):
             for file in evaluation_files:  # 遍历当前 Session 的 EmoEvaluation 文件
                 with open(emo_evaluation_dir + file, encoding="utf-8") as f:
                     content = f.read()
-                # 匹配正则化模式对应的所有内容，得到数据列表
+                # 匹配正则化模式对应的所有内容, 得到数据列表
                 # 匹配被[]包裹的数据行,数据示例: [开始时间 - 结束时间] 文件名称 情感 [V, A, D]
                 info_lines = re.findall(info_line, content)
-                for line in info_lines[1:]:  # 忽略第一行，无用，不是想要的数据
-                    # strip() 方法用于移除字符串头尾指定的字符（默认为空格或换行符）或字符序列。
-                    # .split('\t') 方法用于以制表符为基，分割此字符串
+                for line in info_lines[1:]:  # 忽略第一行, 无用, 不是想要的数据
+                    # strip() 方法用于移除字符串头尾指定的字符 (默认为空格或换行符)或字符序列.
+                    # .split('\t') 方法用于以制表符为基, 分割此字符串
                     (
                         start_end_time,
                         wav_file_name,
                         emotion,
                         val_act_dom,
                     ) = line.strip().split("\t")
-                    # 文件名，用来获取对应的语音和视频文件
+                    # 文件名, 用来获取对应的语音和视频文件
 
                     # 获取当前语音段的开始时间和结束时间
                     start_time, end_time = start_end_time[1:-1].split("-")
@@ -324,15 +324,15 @@ class IEMOCAP(BaseDataset):
                         try:
                             filename, _temp = line.strip().split(" [", 1)
                             text = _temp.strip().split("]: ", 1)[1]
-                            # text = re.sub("\[.+\]", "", text) # 是否替换Text中的声音词，如哈哈大笑
+                            # text = re.sub("\[.+\]", "", text) # 是否替换Text中的声音词, 如哈哈大笑
                             index = self._audios.index(filename)
                             _transcriptions[index] = text
                         except:  # 出错就跳过
                             continue
         self.metainfo = {}
         self.data_list = {}
-        self.metainfo["labels"] = sorted(list((set(_labels))))
-        self.metainfo["genders"] = ["Female", "Male"]
+        self.metainfo["labels"] = tuple(sorted(list((set(_labels)))))
+        self.metainfo["genders"] = tuple(["Female", "Male"])
 
         for i in range(len(self._audios)):
             filename_ = self._audios[i].split("_")
@@ -549,3 +549,100 @@ class IEMOCAP(BaseDataset):
             return "Male"
         else:
             raise ValueError("文件名错误")
+
+
+@DATASETS.register_module()
+class IEMOCAP4C(IEMOCAP):
+    def __init__(self, *arg, **args):
+        is_serialize = args.pop("serialize", True)
+        args["serialize"] = False
+        args.pop("filter")
+        args["filter"] = dict(
+            replace=dict(
+                label=("excited", "happy"),
+            ),
+            drop=dict(
+                label=[
+                    "other",
+                    "xxx",
+                    "frustrated",
+                    "disgusted",
+                    "fearful",
+                    "surprised",
+                ],
+            ),
+        )
+        super().__init__(*arg, **args)
+        self.metainfo["labels"] = tuple(sorted(["happy", "neutral", "sad", "angry"]))
+        for item in self.data_list:
+            item["label_id"] = self.metainfo["labels"].index(item["label"])
+            item["num_classes"] = len(self.metainfo["labels"])
+        if is_serialize:
+            self.serialize = True
+            self.data_bytes, self.data_address = self._serialize_data()
+
+
+@DATASETS.register_module()
+class IEMOCAP7C(IEMOCAP):
+    def __init__(self, *arg, **args):
+        is_serialize = args.pop("serialize", True)
+        args["serialize"] = False
+        args.pop("filter")
+        args["filter"] = dict(
+            drop=dict(
+                label=[
+                    "other",
+                    "xxx",
+                    "fearful",
+                    "surprised",
+                ],
+            ),
+        )
+        super().__init__(*arg, **args)
+        self.metainfo["labels"] = tuple(
+            sorted(
+                [
+                    "excited",
+                    "happy",
+                    "neutral",
+                    "sad",
+                    "angry",
+                    "frustrated",
+                    "disgusted",
+                ]
+            )
+        )
+
+        for item in self.data_list:
+            item["label_id"] = self.metainfo["labels"].index(item["label"])
+            item["num_classes"] = len(self.metainfo["labels"])
+        if is_serialize:
+            self.data_bytes, self.data_address = self._serialize_data()
+
+
+@DATASETS.register_module()
+class IEMOCAP6C(IEMOCAP):
+    def __init__(self, *arg, **args):
+        is_serialize = args.pop("serialize", True)
+        args["serialize"] = False
+        args.pop("filter")
+        args["filter"] = dict(
+            drop=dict(
+                label=[
+                    "other",
+                    "xxx",
+                    "fearful",
+                    "surprised",
+                    "disgusted",
+                ],
+            ),
+        )
+        super().__init__(*arg, **args)
+        self.metainfo["labels"] = tuple(
+            sorted(["excited", "happy", "neutral", "sad", "angry", "frustrated"])
+        )
+        for item in self.data_list:
+            item["label_id"] = self.metainfo["labels"].index(item["label"])
+            item["num_classes"] = len(self.metainfo["labels"])
+        if is_serialize:
+            self.data_bytes, self.data_address = self._serialize_data()

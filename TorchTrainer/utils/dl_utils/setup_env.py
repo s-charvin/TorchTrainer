@@ -9,15 +9,10 @@ from TorchTrainer.utils.logging import print_log
 
 
 def setup_cache_size_limit_of_dynamo():
-    """Setup cache size limit of dynamo.
-
-    Note: Due to the dynamic shape of the loss calculation and
-    post-processing parts in the object detection algorithm, these
-    functions must be compiled every time they are run.
-    Setting a large value for torch._dynamo.config.cache_size_limit
-    may result in repeated compilation, which can slow down training
-    and testing speed. Therefore, we need to set the default value of
-    cache_size_limit smaller. An empirical value is 4.
+    """设置 Dynamo 的缓存大小限制.
+    注意: 由于目标检测算法中损失计算和后处理部分的动态形状, 这些函数每次运行时都必须编译.
+    设置 torch._dynamo.config.cache_size_limit 的较大值可能会导致重复编译, 这可能会降低训练和测试速度.
+    因此, 我们需要将 cache_size_limit 的默认值设置得更小. 一个经验值是 4.
     """
 
     import torch
@@ -41,15 +36,10 @@ def set_multi_processing(
     opencv_num_threads: int = 0,
     distributed: bool = False,
 ) -> None:
-    """Set multi-processing related environment.
-
-    Args:
-        mp_start_method (str): Set the method which should be used to start
-            child processes. Defaults to 'fork'.
-        opencv_num_threads (int): Number of threads for opencv.
-            Defaults to 0.
-        distributed (bool): True if distributed environment.
-            Defaults to False.
+    """设置多进程相关环境
+    - 设置应该用于启动子进程的方法, 默认为'fork'.
+    - 设置 opencv 多线程数为 0
+    - 设置分布式环境(OMP_NUM_THREADS:1, MKL_NUM_THREADS:1)
     """
     # set multi-process start method as `fork` to speed up the training
     if platform.system() != "Windows":
@@ -73,7 +63,6 @@ def set_multi_processing(
         pass
 
     # setup OMP threads
-    # This code is referred from https://github.com/pytorch/pytorch/blob/master/torch/distributed/run.py  # noqa
     if "OMP_NUM_THREADS" not in os.environ and distributed:
         omp_num_threads = 1
         warnings.warn(

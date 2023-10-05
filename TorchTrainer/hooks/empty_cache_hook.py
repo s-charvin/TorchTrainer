@@ -1,4 +1,3 @@
-
 from typing import Optional, Sequence, Union
 
 import torch
@@ -23,22 +22,26 @@ class EmptyCacheHook(Hook):
             Defaults to False.
     """
 
-    priority = 'NORMAL'
+    priority = "NORMAL"
 
-    def __init__(self,
-                 before_epoch: bool = False,
-                 after_epoch: bool = True,
-                 after_iter: bool = False) -> None:
+    def __init__(
+        self,
+        before_epoch: bool = False,
+        after_epoch: bool = True,
+        after_iter: bool = False,
+    ) -> None:
         self._do_before_epoch = before_epoch
         self._do_after_epoch = after_epoch
         self._do_after_iter = after_iter
 
-    def _after_iter(self,
-                    runner,
-                    batch_idx: int,
-                    data_batch: DATA_BATCH = None,
-                    outputs: Optional[Union[dict, Sequence]] = None,
-                    mode: str = 'train') -> None:
+    def _after_iter(
+        self,
+        runner,
+        batch_idx: int,
+        data_batch: DATA_BATCH = None,
+        outputs: Optional[Union[dict, Sequence]] = None,
+        mode: str = "train",
+    ) -> None:
         """Empty cache after an iteration.
 
         Args:
@@ -51,7 +54,7 @@ class EmptyCacheHook(Hook):
         if self._do_after_iter:
             torch.cuda.empty_cache()
 
-    def _before_epoch(self, runner, mode: str = 'train') -> None:
+    def _before_epoch(self, runner, mode: str = "train") -> None:
         """Empty cache before an epoch.
 
         Args:
@@ -61,7 +64,7 @@ class EmptyCacheHook(Hook):
         if self._do_before_epoch:
             torch.cuda.empty_cache()
 
-    def _after_epoch(self, runner, mode: str = 'train') -> None:
+    def _after_epoch(self, runner, mode: str = "train") -> None:
         """Empty cache after an epoch.
 
         Args:

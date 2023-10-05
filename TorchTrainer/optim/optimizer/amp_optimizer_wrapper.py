@@ -1,12 +1,14 @@
-
 from contextlib import contextmanager
 from typing import Union
 
 import torch
 import torch.nn as nn
 
-from TorchTrainer.utils.device import (is_cuda_available, is_mlu_available,
-                             is_npu_available)
+from TorchTrainer.utils.device import (
+    is_cuda_available,
+    is_mlu_available,
+    is_npu_available,
+)
 from TorchTrainer.utils.registry import OPTIM_WRAPPERS
 from TorchTrainer.utils import digit_version
 from TorchTrainer.utils.dl_utils import TORCH_VERSION
@@ -47,7 +49,6 @@ class AmpOptimWrapper(OptimWrapper):
             Valid ``str`` format are `'float16'`, `'bfloat16'`, `'float32'` and
             `'float64'`. If set to ``None``, the default data type will be used.
             Defaults to None.
-            `New in version 0.6.1.`
         **kwargs: Keyword arguments passed to OptimWrapper.
 
     Warnings:
@@ -60,20 +61,23 @@ class AmpOptimWrapper(OptimWrapper):
         ``accumulative_counts``.
     """
 
-    valid_dtypes = ('float16', 'bfloat16', 'float32', 'float64')
+    valid_dtypes = ("float16", "bfloat16", "float32", "float64")
 
-    def __init__(self,
-                 loss_scale: str = 'dynamic',
-                 dtype: Union[str, torch.dtype] = None,
-                 **kwargs):
-        assert digit_version(TORCH_VERSION) >= digit_version('1.6.0'), (
-            '`torch.cuda.amp` is only available when pytorch version >= 1.6')
-        assert is_cuda_available() or is_npu_available() or is_mlu_available(
-        ), ('``AmpOptimizerWrapper`` is only available training '
-            'on gpu, npu or mlu')
+    def __init__(
+        self,
+        loss_scale: str = "dynamic",
+        dtype: Union[str, torch.dtype] = None,
+        **kwargs,
+    ):
+        assert digit_version(TORCH_VERSION) >= digit_version(
+            "1.6.0"
+        ), "`torch.cuda.amp` is only available when pytorch version >= 1.6"
+        assert is_cuda_available() or is_npu_available() or is_mlu_available(), (
+            "``AmpOptimizerWrapper`` is only available training " "on gpu, npu or mlu"
+        )
         super().__init__(**kwargs)
         self._scale_update_param = None
-        if loss_scale == 'dynamic':
+        if loss_scale == "dynamic":
             #  If loss_scale is a string, it must be 'dynamic', then dynamic
             #  loss scaling will be used.
             self.loss_scaler = GradScaler()
@@ -85,17 +89,21 @@ class AmpOptimWrapper(OptimWrapper):
             # More specific configuration.
             self.loss_scaler = GradScaler(**loss_scale)
         else:
-            raise TypeError('loss_scale must be of type float, dict, or '
-                            f'"dynamic", but got {loss_scale}')
+            raise TypeError(
+                "loss_scale must be of type float, dict, or "
+                f'"dynamic", but got {loss_scale}'
+            )
 
         # convert string value to torch.dtype
         if isinstance(dtype, str):
-            assert dtype in self.valid_dtypes, (
-                f'dtype should be any of {self.valid_dtypes}, got {dtype}')
+            assert (
+                dtype in self.valid_dtypes
+            ), f"dtype should be any of {self.valid_dtypes}, got {dtype}"
             dtype = getattr(torch, dtype)
 
-        assert dtype is None or isinstance(dtype, torch.dtype), (
-            f'dtype should be None or instance of torch.dtype, got {dtype}')
+        assert dtype is None or isinstance(
+            dtype, torch.dtype
+        ), f"dtype should be None or instance of torch.dtype, got {dtype}"
         self.cast_dtype = dtype
 
     def backward(self, loss: torch.Tensor, **kwargs):
@@ -134,7 +142,7 @@ class AmpOptimWrapper(OptimWrapper):
         """
         # save state_dict of loss_scaler
         state_dict = super().state_dict()
-        state_dict['loss_scaler'] = self.loss_scaler.state_dict()
+        state_dict["loss_scaler"] = self.loss_scaler.state_dict()
         return state_dict
 
     def load_state_dict(self, state_dict: dict):
@@ -149,11 +157,11 @@ class AmpOptimWrapper(OptimWrapper):
             state_dict (dict): The state dict of :attr:`optimizer` and
                 :attr:`loss_scaler`
         """
-        if 'loss_scaler' in state_dict:
-            self.loss_scaler.load_state_dict(state_dict.pop('loss_scaler'))
+        if "loss_scaler" in state_dict:
+            self.loss_scaler.load_state_dict(state_dict.pop("loss_scaler"))
 
-        if 'base_param_settings' in state_dict:
-            self.base_param_settings = state_dict.pop('base_param_settings')
+        if "base_param_settings" in state_dict:
+            self.base_param_settings = state_dict.pop("base_param_settings")
 
         # load state_dict of optimizer
         self.optimizer.load_state_dict(state_dict)
@@ -168,5 +176,6 @@ class AmpOptimWrapper(OptimWrapper):
             model (nn.Module): The training model.
         """
         from TorchTrainer.runner.amp import autocast
+
         with super().optim_context(model), autocast(dtype=self.cast_dtype):
             yield

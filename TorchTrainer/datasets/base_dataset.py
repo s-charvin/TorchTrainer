@@ -4,7 +4,7 @@ import gc
 import pickle
 import numpy as np
 import re
-from typing import  Callable, List, Optional, Sequence, Tuple, Union
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 from torch.utils.data import Dataset
 
@@ -69,17 +69,45 @@ class BaseDataset(Dataset):
     - 支持获取数据集中指定索引位置处未处理的数据.
     - 支持获取数据集子集(subset).
 
-    过滤规则样例:
-        >>> filter = {
-        >>>     "replace": {
-        >>>         "label": ("origin", "object")
-        >>>     },
-        >>>     "dropna": ["label"],
-        >>>     "contains": {
-        >>>         "img": "a.jpg"
-        >>>     },
-        >>>     "query": "label == 1" # 仅支持逻辑运算 ==, !=, >, <, >=, <=
-        >>> }
+
+    data_list: List[dict] = [
+        {"img": "a.jpg", "label": "cat", label_id: 0},
+        {"img": "b.jpg", "label": "dog", label_id: 1},
+        {"img": "c.png", "label": "cat", label_id: 0},
+        {"img": "d.png", "label": "dog", label_id: 1},
+        ...
+    ]
+    metainfo: dict = {
+        "classes": ["cat", "dog", ...],
+        "num_classes": 2,
+    }
+
+    filter: dict = {
+
+        "replace": {"label": ("cat", "dog")},
+        # "replace": {"label": {"cat": "dog"}},
+        # "replace": {"label": [("cat", "dog"), ("dog", "cat")]},
+        # "replace": {"label": [{"cat": "dog"}, {"dog": "cat"}]},
+
+        "drop": {"label": "cat"},
+        # "drop": {"label": ["cat", "dog"]},
+        # "drop": "label",
+        # "drop": ["label", "img"],
+
+        "contain": {"img": ".jpg"},
+        # "contain": {"img": [".jpg", ".png"]},
+
+        "query": "label_id == 0",
+        # "query": "label_id != 0",
+        # "query": "label_id > 0",
+        # "query": "label_id >= 0",
+        # "query": "label_id < 0",
+        # "query": "label_id <= 0",
+        # "query": "label_id in [0, 1]",
+        # "query": "label_id not in [0, 1]",
+        # "query": "label_id > 0 & label_id < 2",
+        # "query": "label_id < 0 | label_id > 2",
+    }
     """
 
     def __init__(
@@ -102,16 +130,11 @@ class BaseDataset(Dataset):
         if isfile(self.root):
             self.load_info_from_local()
         else:
-            # metadata of the dataset, e.g. video fps, image shape, classes
-            # list of all data samples, e.g. [{'img': 'a.jpg', 'label': 0}, ...]
             self.data_list, self.metainfo = self.load_info()
-        # filter illegal data, such as data that has no annotations.
         self.filter()
-        # serialize data_list
         if self.serialize:
             self.data_bytes, self.data_address = self._serialize_data()
 
-        # Build pipeline.
         self.pipeline = Transform(transforms)
 
     def load_info_from_local(self):
@@ -141,30 +164,50 @@ class BaseDataset(Dataset):
         raise NotImplementedError
 
     def _is_filtered(self, data, filter_cfg):
+        """判断数据项是否被过滤."""
         if isinstance(filter_cfg, dict):
             for type, rule in filter_cfg.items():
                 if type == "replace":
                     for key, value in rule.items():
-                        # value = ("oringin", "object")
-                        if key in data and data[key] == value[0]:
-                            data[key] = value[1]
-                elif type == "dropna":
-                    for key in rule:
-                        if key in data:
-                            return True
-                elif type == "contains":
+                        # value = ("origin", "object") | {"cat": "dog"} | [("cat", "dog"), ("dog", "cat")] | [{"cat": "dog"}, {"dog": "cat"}]
+                        value = [value] if not isinstance(value, list) else value
+                        for item in value:
+                            # item = ("origin", "object") | {"cat": "dog"}
+                            if isinstance(item, tuple):
+                                if key in data and data[key] == item[0]:
+                                    data[key] = item[1]
+                            elif isinstance(item, dict):
+                                if key in data and data[key] in item:
+                                    data[key] = item[data[key]]
+                elif type == "drop":
+                    if isinstance(rule, str):
+                        rule = [rule]
+                    if isinstance(rule, list):
+                        for key in rule:
+                            if key in data:
+                                del data[key]
+                        # 结束, 继续下一个过滤规则
+                        continue
+
+                    if isinstance(rule, dict):
+                        for key, value in rule.items():
+                            value = [value] if not isinstance(value, list) else value
+                            if key in data and data[key] in value:
+                                return True
+                elif type == "contain":
                     for key, value in rule.items():
-                        if key in data and value in data[key]:
+                        value = [value] if not isinstance(value, list) else value
+                        if key in data and any(v in data[key] for v in value):
                             return True
                 elif type == "query":
                     # r"(\w+)\s*([=!<>]+|in|not in)\s*([^&\s]+|\w+)"
-                    matches = re.findall(r"(\w+)\s*([=!<>]+)\s*([^&\s]+)", rule)
+                    matches = re.findall(r"(\w+)\s*([=!<>]+)\s*([^&\|]+)", rule)
                     if not matches:
                         raise ValueError("Invalid query format")
                     for key, operator, value in matches:
                         if key not in data:
                             return False
-                        query = f"{data[key]}{operator}{value}"
+                        query = f"{data[key]!r}{operator}{value.strip()}"
                         if eval(query):
                             return True
         return False

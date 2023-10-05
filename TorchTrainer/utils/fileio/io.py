@@ -1,33 +1,16 @@
-"""This module provides unified file I/O related functions, which support
-operating I/O with different file backends based on the specified filepath or
-backend_args.
+"""这里提供了统一的文件I/O相关函数, 支持根据指定的文件路径或 backend_args 操作不同的文件后端的I/O.
 
-TorchTrainer currently supports five file backends:
+目前支持五种文件后端:
+    - LocalBackend
+    - PetrelBackend
+    - HTTPBackend
+    - LmdbBackend
+    - MemcacheBackend
 
-- LocalBackend
-- PetrelBackend
-- HTTPBackend
-- LmdbBackend
-- MemcacheBackend
-
-Note that this module provide a union of all of the above file backends so
-NotImplementedError will be raised if the interface in the file backend is not
-implemented.
-
-There are two ways to call a method of a file backend:
-
-- Initialize a file backend with ``get_file_backend`` and call its methods.
-- Directory call unified I/O functions, which will call ``get_file_backend``
-  first and then call the corresponding backend method.
-
-Examples:
-    >>> # Initialize a file backend and call its methods
-    >>> import TorchTrainer.utils as fileio
-    >>> backend = fileio.get_file_backend(backend_args={'backend': 'petrel'})
-    >>> backend.get('s3://path/of/your/file')
-
-    >>> # Directory call unified I/O functions
-    >>> fileio.get('s3://path/of/your/file')
+注意: 该模块提供了上述所有文件后端的并集, 因此如果文件后端中的接口没有实现, 将会抛出 NotImplementedError.
+这里提供了两种调用文件后端方法的方式:
+    - 通过 ``get_file_backend`` 初始化一个文件后端, 然后调用其方法.
+    - 直接调用统一的I/O函数, 该函数会先调用 ``get_file_backend`` 获取对应的后端, 然后再调用对应的后端方法.
 """
 import json
 import warnings
@@ -38,7 +21,6 @@ from typing import Generator, Iterator, Optional, Tuple, Union
 
 from TorchTrainer.utils import is_filepath, is_str
 from .backends import backends, prefix_to_backends
-from .file_client import FileClient
 
 # file_handlers and register_handler had been moved to
 # TorchTrainer/fileio/handlers/registry_utis. Import them
@@ -49,18 +31,7 @@ backend_instances: dict = {}
 
 
 def _parse_uri_prefix(uri: Union[str, Path]) -> str:
-    """Parse the prefix of uri.
-
-    Args:
-        uri (str or Path): Uri to be parsed that contains the file prefix.
-
-    Examples:
-        >>> _parse_uri_prefix('/home/path/of/your/file')
-        ''
-        >>> _parse_uri_prefix('s3://path/of/your/file')
-        's3'
-        >>> _parse_uri_prefix('clusterName:s3://path/of/your/file')
-        's3'
+    """解析 uri 文件的前缀.
 
     Returns:
         str: Return the prefix of uri if the uri contains '://'. Otherwise,
@@ -82,13 +53,7 @@ def _parse_uri_prefix(uri: Union[str, Path]) -> str:
 
 
 def _get_file_backend(prefix: str, backend_args: dict):
-    """Return a file backend based on the prefix or backend_args.
-
-    Args:
-        prefix (str): Prefix of uri.
-        backend_args (dict): Arguments to instantiate the corresponding
-            backend.
-    """
+    """基于 uri 的前缀或 backend_args 返回对应的文件后端."""
     # backend name has a higher priority
     if "backend" in backend_args:
         # backend_args should not be modified
@@ -106,8 +71,7 @@ def get_file_backend(
     backend_args: Optional[dict] = None,
     enable_singleton: bool = False,
 ):
-    """Return a file backend based on the prefix of uri or backend_args.
-
+    """基于 uri 的前缀或 backend_args 返回对应的文件后端.
     Args:
         uri (str or Path): Uri to be parsed that contains the file prefix.
         backend_args (dict, optional): Arguments to instantiate the
@@ -115,18 +79,6 @@ def get_file_backend(
         enable_singleton (bool): Whether to enable the singleton pattern.
             If it is True, the backend created will be reused if the
             signature is same with the previous one. Defaults to False.
-
-    Returns:
-        BaseStorageBackend: Instantiated Backend object.
-
-    Examples:
-        >>> # get file backend based on the prefix of uri
-        >>> uri = 's3://path/of/your/file'
-        >>> backend = get_file_backend(uri)
-        >>> # get file backend based on the backend_args
-        >>> backend = get_file_backend(backend_args={'backend': 'petrel'})
-        >>> # backend name has a higher priority if 'backend' in backend_args
-        >>> backend = get_file_backend(uri, backend_args={'backend': 'petrel'})
     """
     global backend_instances
 
@@ -161,7 +113,7 @@ def get(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> bytes:
-    """Read bytes from a given ``filepath`` with 'rb' mode.
+    """从给定的 ``filepath`` 中读取字节数据.
 
     Args:
         filepath (str or Path): Path to read data.
@@ -170,11 +122,6 @@ def get(
 
     Returns:
         bytes: Expected bytes object.
-
-    Examples:
-        >>> filepath = '/path/of/file'
-        >>> get(filepath)
-        b'hello world'
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -187,8 +134,7 @@ def get_text(
     encoding="utf-8",
     backend_args: Optional[dict] = None,
 ) -> str:
-    """Read text from a given ``filepath`` with 'r' mode.
-
+    """从给定的 ``filepath`` 中读取文本数据.
     Args:
         filepath (str or Path): Path to read data.
         encoding (str): The encoding format used to open the ``filepath``.
@@ -198,11 +144,6 @@ def get_text(
 
     Returns:
         str: Expected text reading from ``filepath``.
-
-    Examples:
-        >>> filepath = '/path/of/file'
-        >>> get_text(filepath)
-        'hello world'
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -215,21 +156,14 @@ def put(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> None:
-    """Write bytes to a given ``filepath`` with 'wb' mode.
-
-    Note:
-        ``put`` should create a directory if the directory of
-        ``filepath`` does not exist.
+    """向给定的 ``filepath`` 中写入字节数据.
+    注意: ``put`` 应该在 ``filepath`` 的目录不存在时创建目录.
 
     Args:
         obj (bytes): Data to be written.
         filepath (str or Path): Path to write data.
         backend_args (dict, optional): Arguments to instantiate the
             corresponding backend. Defaults to None.
-
-    Examples:
-        >>> filepath = '/path/of/file'
-        >>> put(b'hello world', filepath)
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -242,11 +176,8 @@ def put_text(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> None:
-    """Write text to a given ``filepath`` with 'w' mode.
-
-    Note:
-        ``put_text`` should create a directory if the directory of
-        ``filepath`` does not exist.
+    """向给定的 ``filepath`` 中写入文本数据.
+    注意: ``put_text`` 应该在 ``filepath`` 的目录不存在时创建目录.
 
     Args:
         obj (str): Data to be written.
@@ -255,10 +186,6 @@ def put_text(
             ``filepath``. Defaults to 'utf-8'.
         backend_args (dict, optional): Arguments to instantiate the
             corresponding backend. Defaults to None.
-
-    Examples:
-        >>> filepath = '/path/of/file'
-        >>> put_text('hello world', filepath)
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -270,20 +197,12 @@ def exists(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> bool:
-    """Check whether a file path exists.
+    """检查 ``filepath`` 是否存在.
 
     Args:
         filepath (str or Path): Path to be checked whether exists.
         backend_args (dict, optional): Arguments to instantiate the
             corresponding backend. Defaults to None.
-
-    Returns:
-        bool: Return ``True`` if ``filepath`` exists, ``False`` otherwise.
-
-    Examples:
-        >>> filepath = '/path/of/file'
-        >>> exists(filepath)
-        True
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -295,22 +214,13 @@ def isdir(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> bool:
-    """Check whether a file path is a directory.
+    """检查 ``filepath`` 是否是一个目录.
 
     Args:
         filepath (str or Path): Path to be checked whether it is a
             directory.
         backend_args (dict, optional): Arguments to instantiate the
             corresponding backend. Defaults to None.
-
-    Returns:
-        bool: Return ``True`` if ``filepath`` points to a directory,
-        ``False`` otherwise.
-
-    Examples:
-        >>> filepath = '/path/of/dir'
-        >>> isdir(filepath)
-        True
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -322,21 +232,12 @@ def isfile(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> bool:
-    """Check whether a file path is a file.
+    """检查 ``filepath`` 是否是一个文件.
 
     Args:
         filepath (str or Path): Path to be checked whether it is a file.
         backend_args (dict, optional): Arguments to instantiate the
             corresponding backend. Defaults to None.
-
-    Returns:
-        bool: Return ``True`` if ``filepath`` points to a file, ``False``
-        otherwise.
-
-    Examples:
-        >>> filepath = '/path/of/file'
-        >>> isfile(filepath)
-        True
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -349,10 +250,7 @@ def join_path(
     *filepaths: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Union[str, Path]:
-    r"""Concatenate all file paths.
-
-    Join one or more filepath components intelligently. The return value
-    is the concatenation of filepath and any members of \*filepaths.
+    r"""拼接所有的文件路径.
 
     Args:
         filepath (str or Path): Path to be concatenated.
@@ -362,13 +260,6 @@ def join_path(
 
     Returns:
         str: The result of concatenation.
-
-    Examples:
-        >>> filepath1 = '/path/of/dir1'
-        >>> filepath2 = 'dir2'
-        >>> filepath3 = 'path/of/file'
-        >>> join_path(filepath1, filepath2, filepath3)
-        '/path/of/dir/dir2/path/of/file'
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -381,15 +272,12 @@ def get_local_path(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Generator[Union[str, Path], None, None]:
-    """Download data from ``filepath`` and write the data to local path.
+    """从 ``filepath`` 中下载数据并写入本地路径.
+    此函数被 :meth:`contxtlib.contextmanager` 装饰, 可以使用 ``with`` 语句调用,
+    当从 ``with`` 语句中退出时, 临时路径将被释放.
 
-    ``get_local_path`` is decorated by :meth:`contxtlib.contextmanager`. It
-    can be called with ``with`` statement, and when exists from the
-    ``with`` statement, the temporary path will be released.
-
-    Note:
-        If the ``filepath`` is a local path, just return itself and it will
-        not be released (removed).
+    注意: 如果 ``filepath`` 是一个本地路径, 则直接返回 ``filepath``. 否则, 会从
+    ``filepath`` 中下载数据并写入本地路径, 然后返回本地路径.
 
     Args:
         filepath (str or Path): Path to be read data.
@@ -398,10 +286,6 @@ def get_local_path(
 
     Yields:
         Iterable[str]: Only yield one path.
-
-    Examples:
-        >>> with get_local_path('s3://bucket/abc.jpg') as path:
-        ...     # do something here
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -415,11 +299,10 @@ def copyfile(
     dst: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Union[str, Path]:
-    """Copy a file src to dst and return the destination file.
-
-    src and dst should have the same prefix. If dst specifies a directory,
-    the file will be copied into dst using the base filename from src. If
-    dst specifies a file that already exists, it will be replaced.
+    """复制 ``src`` 文件到 ``dst`` 并返回 ``dst``.
+    ``src`` 和 ``dst`` 应该有相同的前缀. 如果 ``dst`` 指定了一个目录, 则 ``src``
+    将被复制到 ``dst`` 中, 使用 ``src`` 的基本文件名. 如果 ``dst`` 指定的文件已经
+    存在, 它将被替换.
 
     Args:
         src (str or Path): A file to be copied.
@@ -433,20 +316,6 @@ def copyfile(
     Raises:
         SameFileError: If src and dst are the same file, a SameFileError will
             be raised.
-
-    Examples:
-        >>> # dst is a file
-        >>> src = '/path/of/file'
-        >>> dst = '/path1/of/file1'
-        >>> # src will be copied to '/path1/of/file1'
-        >>> copyfile(src, dst)
-        '/path1/of/file1'
-
-        >>> # dst is a directory
-        >>> dst = '/path1/of/dir'
-        >>> # src will be copied to '/path1/of/dir/file'
-        >>> copyfile(src, dst)
-        '/path1/of/dir/file'
     """
     backend = get_file_backend(src, backend_args=backend_args, enable_singleton=True)
     return backend.copyfile(src, dst)
@@ -457,10 +326,8 @@ def copytree(
     dst: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Union[str, Path]:
-    """Recursively copy an entire directory tree rooted at src to a directory
-    named dst and return the destination directory.
-
-    src and dst should have the same prefix and dst must not already exist.
+    """递归的复制 ``src`` 目录到 ``dst`` 并返回 ``dst``.
+    ``src`` 和 ``dst`` 应该有相同的前缀. ``dst`` 必须不存在.
 
     Args:
         src (str or Path): A directory to be copied.
@@ -474,12 +341,6 @@ def copytree(
     Raises:
         FileExistsError: If dst had already existed, a FileExistsError will be
             raised.
-
-    Examples:
-        >>> src = '/path/of/dir1'
-        >>> dst = '/path/of/dir2'
-        >>> copytree(src, dst)
-        '/path/of/dir2'
     """
     backend = get_file_backend(src, backend_args=backend_args, enable_singleton=True)
     return backend.copytree(src, dst)
@@ -490,11 +351,8 @@ def copyfile_from_local(
     dst: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Union[str, Path]:
-    """Copy a local file src to dst and return the destination file.
-
-    Note:
-        If the backend is the instance of LocalBackend, it does the same
-        thing with :func:`copyfile`.
+    """从本地复制 ``src`` 文件到 ``dst`` 并返回 ``dst``.
+    如果 backend 是 LocalBackend 的实例, 则与 :func:`copyfile` 做相同的事情.
 
     Args:
         src (str or Path): A local file to be copied.
@@ -505,20 +363,6 @@ def copyfile_from_local(
     Returns:
         str: If dst specifies a directory, the file will be copied into dst
         using the base filename from src.
-
-    Examples:
-        >>> # dst is a file
-        >>> src = '/path/of/file'
-        >>> dst = 's3://openmmlab/TorchTrainer/file1'
-        >>> # src will be copied to 's3://openmmlab/TorchTrainer/file1'
-        >>> copyfile_from_local(src, dst)
-        s3://openmmlab/TorchTrainer/file1
-
-        >>> # dst is a directory
-        >>> dst = 's3://openmmlab/TorchTrainer'
-        >>> # src will be copied to 's3://openmmlab/TorchTrainer/file''
-        >>> copyfile_from_local(src, dst)
-        's3://openmmlab/TorchTrainer/file'
     """
     backend = get_file_backend(dst, backend_args=backend_args, enable_singleton=True)
     return backend.copyfile_from_local(src, dst)
@@ -529,12 +373,8 @@ def copytree_from_local(
     dst: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Union[str, Path]:
-    """Recursively copy an entire directory tree rooted at src to a directory
-    named dst and return the destination directory.
-
-    Note:
-        If the backend is the instance of LocalBackend, it does the same
-        thing with :func:`copytree`.
+    """递归的从本地复制 ``src`` 目录到 ``dst`` 并返回 ``dst``.
+    如果 backend 是 LocalBackend 的实例, 则与 :func:`copytree` 做相同的事情.
 
     Args:
         src (str or Path): A local directory to be copied.
@@ -544,12 +384,6 @@ def copytree_from_local(
 
     Returns:
         str: The destination directory.
-
-    Examples:
-        >>> src = '/path/of/dir'
-        >>> dst = 's3://openmmlab/TorchTrainer/dir'
-        >>> copyfile_from_local(src, dst)
-        's3://openmmlab/TorchTrainer/dir'
     """
     backend = get_file_backend(dst, backend_args=backend_args, enable_singleton=True)
     return backend.copytree_from_local(src, dst)
@@ -560,15 +394,11 @@ def copyfile_to_local(
     dst: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Union[str, Path]:
-    """Copy the file src to local dst and return the destination file.
+    """复制 ``src`` 文件到本地 ``dst`` 并返回 ``dst``.
+    如果 backend 是 LocalBackend 的实例, 则与 :func:`copyfile` 做相同的事情.
 
-    If dst specifies a directory, the file will be copied into dst using
-    the base filename from src. If dst specifies a file that already
-    exists, it will be replaced.
-
-    Note:
-        If the backend is the instance of LocalBackend, it does the same
-        thing with :func:`copyfile`.
+    如果 ``dst`` 指定了一个目录, 则 ``src`` 将被复制到 ``dst`` 中, 使用 ``src`` 的
+    基本文件名. 如果 ``dst`` 指定的文件已经存在, 它将被替换.
 
     Args:
         src (str or Path): A file to be copied.
@@ -579,20 +409,6 @@ def copyfile_to_local(
     Returns:
         str: If dst specifies a directory, the file will be copied into dst
         using the base filename from src.
-
-    Examples:
-        >>> # dst is a file
-        >>> src = 's3://openmmlab/TorchTrainer/file'
-        >>> dst = '/path/of/file'
-        >>> # src will be copied to '/path/of/file'
-        >>> copyfile_to_local(src, dst)
-        '/path/of/file'
-
-        >>> # dst is a directory
-        >>> dst = '/path/of/dir'
-        >>> # src will be copied to '/path/of/dir/file'
-        >>> copyfile_to_local(src, dst)
-        '/path/of/dir/file'
     """
     backend = get_file_backend(dst, backend_args=backend_args, enable_singleton=True)
     return backend.copyfile_to_local(src, dst)
@@ -603,13 +419,8 @@ def copytree_to_local(
     dst: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> Union[str, Path]:
-    """Recursively copy an entire directory tree rooted at src to a local
-    directory named dst and return the destination directory.
-
-    Note:
-        If the backend is the instance of LocalBackend, it does the same
-        thing with :func:`copytree`.
-
+    """递归地将以 ``src`` 为根的整个目录树复制到名为 ``dst`` 的本地目录, 并返回 ``dst``.
+    如果 backend 是 LocalBackend 的实例, 则与 :func:`copytree` 做相同的事情.
     Args:
         src (str or Path): A directory to be copied.
         dst (str or Path): Copy directory to local dst.
@@ -618,12 +429,6 @@ def copytree_to_local(
 
     Returns:
         str: The destination directory.
-
-    Examples:
-        >>> src = 's3://openmmlab/TorchTrainer/dir'
-        >>> dst = '/path/of/dir'
-        >>> copytree_to_local(src, dst)
-        '/path/of/dir'
     """
     backend = get_file_backend(dst, backend_args=backend_args, enable_singleton=True)
     return backend.copytree_to_local(src, dst)
@@ -633,7 +438,7 @@ def remove(
     filepath: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> None:
-    """Remove a file.
+    """移除 ``filepath`` 代表的文件.
 
     Args:
         filepath (str, Path): Path to be removed.
@@ -645,10 +450,6 @@ def remove(
             will be raised.
         IsADirectoryError: If filepath is a directory, an IsADirectoryError
             will be raised.
-
-    Examples:
-        >>> filepath = '/path/of/file'
-        >>> remove(filepath)
     """
     backend = get_file_backend(
         filepath, backend_args=backend_args, enable_singleton=True
@@ -660,16 +461,12 @@ def rmtree(
     dir_path: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> None:
-    """Recursively delete a directory tree.
+    """递归地删除目录中的文件.
 
     Args:
         dir_path (str or Path): A directory to be removed.
         backend_args (dict, optional): Arguments to instantiate the
             corresponding backend. Defaults to None.
-
-    Examples:
-        >>> dir_path = '/path/of/dir'
-        >>> rmtree(dir_path)
     """
     backend = get_file_backend(
         dir_path, backend_args=backend_args, enable_singleton=True
@@ -682,10 +479,8 @@ def copy_if_symlink_fails(
     dst: Union[str, Path],
     backend_args: Optional[dict] = None,
 ) -> bool:
-    """Create a symbolic link pointing to src named dst.
-
-    If failed to create a symbolic link pointing to src, directory copy src to
-    dst instead.
+    """创建一个指向 ``src`` 的符号链接, 名为 ``dst``.
+    如果创建指向 ``src`` 的符号链接失败, 则将 ``src`` 复制到 ``dst``.
 
     Args:
         src (str or Path): Create a symbolic link pointing to src.
@@ -696,16 +491,6 @@ def copy_if_symlink_fails(
     Returns:
         bool: Return True if successfully create a symbolic link pointing to
         src. Otherwise, return False.
-
-    Examples:
-        >>> src = '/path/of/file'
-        >>> dst = '/path1/of/file1'
-        >>> copy_if_symlink_fails(src, dst)
-        True
-        >>> src = '/path/of/dir'
-        >>> dst = '/path1/of/dir1'
-        >>> copy_if_symlink_fails(src, dst)
-        True
     """
     backend = get_file_backend(src, backend_args=backend_args, enable_singleton=True)
     return backend.copy_if_symlink_fails(src, dst)
@@ -719,11 +504,7 @@ def list_dir_or_file(
     recursive: bool = False,
     backend_args: Optional[dict] = None,
 ) -> Iterator[str]:
-    """Scan a directory to find the interested directories or files in
-    arbitrary order.
-
-    Note:
-        :meth:`list_dir_or_file` returns the path relative to ``dir_path``.
+    """扫描目录, 以任意顺序查找感兴趣的目录或文件.
 
     Args:
         dir_path (str or Path): Path of the directory.
@@ -738,26 +519,6 @@ def list_dir_or_file(
 
     Yields:
         Iterable[str]: A relative path to ``dir_path``.
-
-    Examples:
-        >>> dir_path = '/path/of/dir'
-        >>> for file_path in list_dir_or_file(dir_path):
-        ...     print(file_path)
-        >>> # list those files and directories in current directory
-        >>> for file_path in list_dir_or_file(dir_path):
-        ...     print(file_path)
-        >>> # only list files
-        >>> for file_path in list_dir_or_file(dir_path, list_dir=False):
-        ...     print(file_path)
-        >>> # only list directories
-        >>> for file_path in list_dir_or_file(dir_path, list_file=False):
-        ...     print(file_path)
-        >>> # only list files ending with specified suffixes
-        >>> for file_path in list_dir_or_file(dir_path, suffix='.txt'):
-        ...     print(file_path)
-        >>> # list all files and directory recursively
-        >>> for file_path in list_dir_or_file(dir_path, recursive=True):
-        ...     print(file_path)
     """
     backend = get_file_backend(
         dir_path, backend_args=backend_args, enable_singleton=True
@@ -773,11 +534,7 @@ def generate_presigned_url(
     expires_in: int = 3600,
     backend_args: Optional[dict] = None,
 ) -> str:
-    """Generate the presigned url of video stream which can be passed to
-    mmcv.VideoReader. Now only work on Petrel backend.
-
-    Note:
-        Now only work on Petrel backend.
+    """生成视频流的预签名 url, 可以传递给 VideoReader. 目前仅支持 Petrel 后端.
 
     Args:
         url (str): Url of video stream.
@@ -794,14 +551,9 @@ def generate_presigned_url(
     return backend.generate_presigned_url(url, client_method, expires_in)
 
 
-def load(file, file_format=None, file_client_args=None, backend_args=None, **kwargs):
-    """Load data from json/yaml/pickle files.
-
-    This method provides a unified api for loading data from serialized files.
-
-    ``load`` supports loading data from serialized files those can be storaged
-    in different backends.
-
+def load(file, file_format=None, backend_args=None, **kwargs):
+    """该方法提供了一个统一的 api, 用于从不同后端存储的序列化文件中加载数据.
+    如从 json/yaml/pickle 文件中加载数据.
     Args:
         file (str or :obj:`Path` or file-like object): Filename or a file-like
             object.
@@ -809,18 +561,8 @@ def load(file, file_format=None, file_client_args=None, backend_args=None, **kwa
             inferred from the file extension, otherwise use the specified one.
             Currently supported formats include "json", "yaml/yml" and
             "pickle/pkl".
-        file_client_args (dict, optional): Arguments to instantiate a
-            FileClient. See :class:`TorchTrainer.utils.FileClient` for details.
-            Defaults to None. It will be deprecated in future. Please use
-            ``backend_args`` instead.
         backend_args (dict, optional): Arguments to instantiate the
             prefix of uri corresponding backend. Defaults to None.
-            New in v0.2.0.
-
-    Examples:
-        >>> load('/path/of/your/file')  # file is storaged in disk
-        >>> load('https://path/of/your/file')  # file is storaged in Internet
-        >>> load('s3://path/of/your/file')  # file is storaged in petrel
 
     Returns:
         The content from the file.
@@ -832,25 +574,9 @@ def load(file, file_format=None, file_client_args=None, backend_args=None, **kwa
     if file_format not in file_handlers:
         raise TypeError(f"Unsupported format: {file_format}")
 
-    if file_client_args is not None:
-        warnings.warn(
-            '"file_client_args" will be deprecated in future. '
-            'Please use "backend_args" instead',
-            DeprecationWarning,
-        )
-        if backend_args is not None:
-            raise ValueError(
-                '"file_client_args and "backend_args" cannot be set at the '
-                "same time."
-            )
-
     handler = file_handlers[file_format]
     if is_str(file):
-        if file_client_args is not None:
-            file_client = FileClient.infer_client(file_client_args, file)
-            file_backend = file_client
-        else:
-            file_backend = get_file_backend(file, backend_args=backend_args)
+        file_backend = get_file_backend(file, backend_args=backend_args)
 
         if handler.str_like:
             with StringIO(file_backend.get_text(file)) as f:
@@ -865,16 +591,9 @@ def load(file, file_format=None, file_client_args=None, backend_args=None, **kwa
     return obj
 
 
-def dump(
-    obj, file=None, file_format=None, file_client_args=None, backend_args=None, **kwargs
-):
-    """Dump data to json/yaml/pickle strings or files.
-
-    This method provides a unified api for dumping data as strings or to files,
-    and also supports custom arguments for each file format.
-
-    ``dump`` supports dumping data as strings or to files which is saved to
-    different backends.
+def dump(obj, file=None, file_format=None, backend_args=None, **kwargs):
+    """该方法提供了一个统一的 api, 用于将数据以不同的格式保存到不同后端的文件中.
+    如将数据保存到 json/yaml/pickle 文件中.
 
     Args:
         obj (any): The python object to be dumped.
@@ -882,17 +601,8 @@ def dump(
             specified, then the object is dumped to a str, otherwise to a file
             specified by the filename or file-like object.
         file_format (str, optional): Same as :func:`load`.
-        file_client_args (dict, optional): Arguments to instantiate a
-            FileClient. See :class:`TorchTrainer.utils.FileClient` for details.
-            Defaults to None. It will be deprecated in future. Please use
-            ``backend_args`` instead.
         backend_args (dict, optional): Arguments to instantiate the
             prefix of uri corresponding backend. Defaults to None.
-            New in v0.2.0.
-
-    Examples:
-        >>> dump('hello world', '/path/of/your/file')  # disk
-        >>> dump('hello world', 's3://path/of/your/file')  # ceph or petrel
 
     Returns:
         bool: True for success, False otherwise.
@@ -908,27 +618,11 @@ def dump(
     if file_format not in file_handlers:
         raise TypeError(f"Unsupported format: {file_format}")
 
-    if file_client_args is not None:
-        warnings.warn(
-            '"file_client_args" will be deprecated in future. '
-            'Please use "backend_args" instead',
-            DeprecationWarning,
-        )
-        if backend_args is not None:
-            raise ValueError(
-                '"file_client_args" and "backend_args" cannot be set at the '
-                "same time."
-            )
-
     handler = file_handlers[file_format]
     if file is None:
         return handler.dump_to_str(obj, **kwargs)
     elif is_str(file):
-        if file_client_args is not None:
-            file_client = FileClient.infer_client(file_client_args, file)
-            file_backend = file_client
-        else:
-            file_backend = get_file_backend(file, backend_args=backend_args)
+        file_backend = get_file_backend(file, backend_args=backend_args)
 
         if handler.str_like:
             with StringIO() as f:

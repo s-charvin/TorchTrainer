@@ -17,7 +17,7 @@ from TorchTrainer.utils.dist import master_only
 from TorchTrainer.utils.logging import print_log
 from TorchTrainer.utils.registry import VISBACKENDS, VISUALIZERS
 from TorchTrainer.structures import BaseDataElement
-from TorchTrainer.utils import ManagerMixin
+from TorchTrainer.utils import GlobalManager
 from TorchTrainer.utils.visualization.utils import (
     check_type,
     check_type_and_length,
@@ -33,10 +33,10 @@ from TorchTrainer.utils.visualization.vis_backend import BaseVisBackend
 
 
 @VISUALIZERS.register_module()
-class Visualizer(ManagerMixin):
-    """一个使用 Matplotlib 库作为后端的Visualizer类.
+class Visualizer(GlobalManager):
+    """基于各种可视化后端实现的可视化类.
 
-    - 基本绘制方法
+    支持的功能包括:
       - draw_bboxes: 绘制单个或多个边界框
       - draw_texts: 绘制单个或多个文本框
       - draw_points: 绘制单个或多个点
@@ -55,7 +55,7 @@ class Visualizer(ManagerMixin):
       - add_scalars: 将多个标量写入所有可视化存储后端s
       - add_datasample: 将数据样本写入所有可视化存储后端.
 
-    - Basic info methods
+    - 基本信息方法
 
       - set_image: 设置原始图像数据
       - get_image: 在绘制后以NumPy格式获取图像数据
@@ -65,7 +65,6 @@ class Visualizer(ManagerMixin):
 
 
     所有基本绘图方法都支持链式调用, 方便叠加绘制和显示.
-    每个下游算法库可以继承Visualizer并实现add_datasample逻辑. 例如, MMDetection中的DetLocalVisualizer继承自Visualizer, 并在add_datasample接口中实现了可视化检测框、实例掩码和语义分割图等功能.
 
     """
 
@@ -161,7 +160,7 @@ class Visualizer(ManagerMixin):
             continue_key (str): The key for users to continue. Defaults to
                 the space key.
             backend (str): The backend to show the image. Defaults to
-                'matplotlib'. `New in version 0.7.3.`
+                'matplotlib'.
         """
         if backend == "matplotlib":
             import matplotlib.pyplot as plt
@@ -416,7 +415,6 @@ class Visualizer(ManagerMixin):
                 just single value. If ``font_properties`` is single value,
                 all the texts will have the same font properties.
                 Defaults to None.
-                `New in version 0.6.0.`
         """
         from matplotlib.font_manager import FontProperties
 

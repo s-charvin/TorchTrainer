@@ -1,4 +1,3 @@
-
 import copy
 import inspect
 from typing import List, Union
@@ -20,11 +19,10 @@ def register_torch_optimizers() -> List[str]:
     """
     torch_optimizers = []
     for module_name in dir(torch.optim):
-        if module_name.startswith('__'):
+        if module_name.startswith("__"):
             continue
         _optim = getattr(torch.optim, module_name)
-        if inspect.isclass(_optim) and issubclass(_optim,
-                                                  torch.optim.Optimizer):
+        if inspect.isclass(_optim) and issubclass(_optim, torch.optim.Optimizer):
             OPTIMIZERS.register_module(module=_optim)
             torch_optimizers.append(module_name)
     return torch_optimizers
@@ -43,16 +41,16 @@ def register_torch_npu_optimizers() -> List[str]:
         return []
 
     import torch_npu
-    if not hasattr(torch_npu, 'optim'):
+
+    if not hasattr(torch_npu, "optim"):
         return []
 
     torch_npu_optimizers = []
     for module_name in dir(torch_npu.optim):
-        if module_name.startswith('__') or module_name in OPTIMIZERS:
+        if module_name.startswith("__") or module_name in OPTIMIZERS:
             continue
         _optim = getattr(torch_npu.optim, module_name)
-        if inspect.isclass(_optim) and issubclass(_optim,
-                                                  torch.optim.Optimizer):
+        if inspect.isclass(_optim) and issubclass(_optim, torch.optim.Optimizer):
             OPTIMIZERS.register_module(module=_optim)
             torch_npu_optimizers.append(module_name)
     return torch_npu_optimizers
@@ -73,10 +71,9 @@ def register_dadaptation_optimizers() -> List[str]:
     except ImportError:
         pass
     else:
-        for module_name in ['DAdaptAdaGrad', 'DAdaptAdam', 'DAdaptSGD']:
+        for module_name in ["DAdaptAdaGrad", "DAdaptAdam", "DAdaptSGD"]:
             _optim = getattr(dadaptation, module_name)
-            if inspect.isclass(_optim) and issubclass(_optim,
-                                                      torch.optim.Optimizer):
+            if inspect.isclass(_optim) and issubclass(_optim, torch.optim.Optimizer):
                 OPTIMIZERS.register_module(module=_optim)
                 dadaptation_optimizers.append(module_name)
     return dadaptation_optimizers
@@ -98,7 +95,7 @@ def register_lion_optimizers() -> List[str]:
         pass
     else:
         OPTIMIZERS.register_module(module=Lion)
-        optimizers.append('Lion')
+        optimizers.append("Lion")
     return optimizers
 
 
@@ -119,8 +116,7 @@ def register_sophia_optimizers() -> List[str]:
     else:
         for module_name in dir(Sophia):
             _optim = getattr(Sophia, module_name)
-            if inspect.isclass(_optim) and issubclass(_optim,
-                                                      torch.optim.Optimizer):
+            if inspect.isclass(_optim) and issubclass(_optim, torch.optim.Optimizer):
                 OPTIMIZERS.register_module(module=_optim)
                 optimizers.append(module_name)
     return optimizers
@@ -129,8 +125,9 @@ def register_sophia_optimizers() -> List[str]:
 SOPHIA_OPTIMIZERS = register_sophia_optimizers()
 
 
-def build_optim_wrapper(model: nn.Module,
-                        cfg: Union[dict, Config, ConfigDict]) -> OptimWrapper:
+def build_optim_wrapper(
+    model: nn.Module, cfg: Union[dict, Config, ConfigDict]
+) -> OptimWrapper:
     """Build function of OptimWrapper.
 
     If ``constructor`` is set in the ``cfg``, this method will build an
@@ -147,18 +144,20 @@ def build_optim_wrapper(model: nn.Module,
         OptimWrapper: The built optimizer wrapper.
     """
     optim_wrapper_cfg = copy.deepcopy(cfg)
-    constructor_type = optim_wrapper_cfg.pop('constructor',
-                                             'DefaultOptimWrapperConstructor')
-    paramwise_cfg = optim_wrapper_cfg.pop('paramwise_cfg', None)
-
+    constructor_type = optim_wrapper_cfg.pop(
+        "constructor", "DefaultOptimWrapperConstructor"
+    )
+    paramwise_cfg = optim_wrapper_cfg.pop("paramwise_cfg", None)
 
     if is_npu_available() and not is_npu_support_full_precision():
-        optim_wrapper_cfg['type'] = 'AmpOptimWrapper'
+        optim_wrapper_cfg["type"] = "AmpOptimWrapper"
 
     optim_wrapper_constructor = OPTIM_WRAPPER_CONSTRUCTORS.build(
         dict(
             type=constructor_type,
             optim_wrapper_cfg=optim_wrapper_cfg,
-            paramwise_cfg=paramwise_cfg))
+            paramwise_cfg=paramwise_cfg,
+        )
+    )
     optim_wrapper = optim_wrapper_constructor(model)
     return optim_wrapper

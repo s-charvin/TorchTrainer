@@ -32,7 +32,7 @@ else:
 
 
 class RemoveAssignFromAST(ast.NodeTransformer):
-    """从抽象语法树(AST)中删除指定名称的赋值语句(Assign node)。"""
+    """从抽象语法树(AST)中删除指定名称的赋值语句(Assign node). """
 
     def __init__(self, key):
         self.key = key

@@ -1,4 +1,3 @@
-
 from typing import Dict, Optional, Union
 
 from TorchTrainer.optim import _ParamScheduler
@@ -11,16 +10,17 @@ DATA_BATCH = Optional[Union[dict, tuple, list]]
 
 @HOOKS.register_module()
 class ParamSchedulerHook(Hook):
-    """A hook to update some hyper-parameters in optimizer, e.g., learning rate
-    and momentum."""
+    """用于在训练过程中的 after_train_iter, after_train_epoch, 更新优化器中的一些超参数, 例如学习率和动量. 此外, 还可以在验证周期结束后的, after_val_epoch 根据需要更新调度器的超参数.."""
 
-    priority = 'LOW'
+    priority = "LOW"
 
-    def after_train_iter(self,
-                         runner,
-                         batch_idx: int,
-                         data_batch: DATA_BATCH = None,
-                         outputs: Optional[dict] = None) -> None:
+    def after_train_iter(
+        self,
+        runner,
+        batch_idx: int,
+        data_batch: DATA_BATCH = None,
+        outputs: Optional[dict] = None,
+    ) -> None:
         """Call step function for each scheduler after each training iteration.
 
         Args:
@@ -50,9 +50,10 @@ class ParamSchedulerHook(Hook):
                 step(param_schedulers)
         else:
             raise TypeError(
-                'runner.param_schedulers should be list of ParamScheduler or '
-                'a dict containing list of ParamScheduler, '
-                f'but got {runner.param_schedulers}')
+                "runner.param_schedulers should be list of ParamScheduler or "
+                "a dict containing list of ParamScheduler, "
+                f"but got {runner.param_schedulers}"
+            )
 
     def after_train_epoch(self, runner) -> None:
         """Call step function for each scheduler after each training epoch.
@@ -77,13 +78,14 @@ class ParamSchedulerHook(Hook):
                 step(param_schedulers)
         else:
             raise TypeError(
-                'runner.param_schedulers should be list of ParamScheduler or '
-                'a dict containing list of ParamScheduler, '
-                f'but got {runner.param_schedulers}')
+                "runner.param_schedulers should be list of ParamScheduler or "
+                "a dict containing list of ParamScheduler, "
+                f"but got {runner.param_schedulers}"
+            )
 
-    def after_val_epoch(self,
-                        runner,
-                        metrics: Optional[Dict[str, float]] = None) -> None:
+    def after_val_epoch(
+        self, runner, metrics: Optional[Dict[str, float]] = None
+    ) -> None:
         """Call step function for each scheduler which has attribute
         ``need_val_args`` after each validation epoch.
 
@@ -112,8 +114,7 @@ class ParamSchedulerHook(Hook):
                 return
 
             for scheduler in param_schedulers:
-                if (scheduler.by_epoch
-                        and getattr(scheduler, 'need_val_args', False)):
+                if scheduler.by_epoch and getattr(scheduler, "need_val_args", False):
                     scheduler.step(metrics)
 
         if isinstance(runner.param_schedulers, list):
@@ -123,6 +124,7 @@ class ParamSchedulerHook(Hook):
                 step(param_schedulers)
         else:
             raise TypeError(
-                'runner.param_schedulers should be list of ParamScheduler or '
-                'a dict containing list of ParamScheduler, '
-                f'but got {runner.param_schedulers}')
+                "runner.param_schedulers should be list of ParamScheduler or "
+                "a dict containing list of ParamScheduler, "
+                f"but got {runner.param_schedulers}"
+            )

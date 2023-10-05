@@ -1,4 +1,3 @@
-
 from contextlib import contextmanager
 from typing import Optional, Union
 
@@ -75,27 +74,28 @@ class ApexOptimWrapper(OptimWrapper):
         the original `max_iters` should be multiplied by
         ``accumulative_counts``.
 
-    Note:
-        `New in version 0.6.0.`
     """
 
-    def __init__(self,
-                 opt_level: str = 'O1',
-                 loss_scale: Union[float, str, None] = 'dynamic',
-                 enabled: Optional[bool] = True,
-                 cast_model_type: Optional[torch.dtype] = None,
-                 patch_torch_functions: Optional[bool] = None,
-                 keep_batchnorm_fp32: Union[bool, str, None] = None,
-                 master_weights: Optional[bool] = None,
-                 cast_model_outputs: Optional[torch.dtype] = None,
-                 num_losses: int = 1,
-                 verbosity: int = 1,
-                 min_loss_scale: Optional[float] = None,
-                 max_loss_scale: Optional[float] = 2.**24,
-                 **kwargs):
-        assert apex_amp is not None, \
-            'Apex is not installed. Please check ' \
-            'https://github.com/NVIDIA/apex#linux.'
+    def __init__(
+        self,
+        opt_level: str = "O1",
+        loss_scale: Union[float, str, None] = "dynamic",
+        enabled: Optional[bool] = True,
+        cast_model_type: Optional[torch.dtype] = None,
+        patch_torch_functions: Optional[bool] = None,
+        keep_batchnorm_fp32: Union[bool, str, None] = None,
+        master_weights: Optional[bool] = None,
+        cast_model_outputs: Optional[torch.dtype] = None,
+        num_losses: int = 1,
+        verbosity: int = 1,
+        min_loss_scale: Optional[float] = None,
+        max_loss_scale: Optional[float] = 2.0**24,
+        **kwargs
+    ):
+        assert apex_amp is not None, (
+            "Apex is not installed. Please check "
+            "https://github.com/NVIDIA/apex#linux."
+        )
         super().__init__(**kwargs)
         self.opt_level = opt_level
         self.loss_scale = loss_scale
@@ -134,7 +134,7 @@ class ApexOptimWrapper(OptimWrapper):
             :attr:`optimizer`.
         """
         state_dict = self.optimizer.state_dict()
-        state_dict['apex_amp'] = apex_amp.state_dict()
+        state_dict["apex_amp"] = apex_amp.state_dict()
         return state_dict
 
     def load_state_dict(self, state_dict: dict) -> None:
@@ -152,15 +152,15 @@ class ApexOptimWrapper(OptimWrapper):
             state_dict (dict): The state dict of :attr:`optimizer` and
                 :attr:`apex_amp`
         """
-        if 'apex_amp' in state_dict:
+        if "apex_amp" in state_dict:
             # when `apex_amp` is not initialized, calling `load_state_dict`
             # will raise an error, so we temporarily cache the apex_amp
             # part, and then load it into `apex_amp` after completing
             # the `apex_amp` initialization in `optim_context` method
-            if hasattr(self.optimizer, '_amp_stash'):
-                apex_amp.load_state_dict(state_dict.pop('apex_amp'))
+            if hasattr(self.optimizer, "_amp_stash"):
+                apex_amp.load_state_dict(state_dict.pop("apex_amp"))
             else:
-                self._apex_amp_state_dict = state_dict.pop('apex_amp')
+                self._apex_amp_state_dict = state_dict.pop("apex_amp")
         self.optimizer.load_state_dict(state_dict)
 
     @contextmanager
@@ -175,7 +175,7 @@ class ApexOptimWrapper(OptimWrapper):
         with super().optim_context(model):
             # when a given optimizer be passed through apex_amp.initialize,
             # the "_amp_stash" property will be added
-            if not hasattr(self.optimizer, '_amp_stash'):
+            if not hasattr(self.optimizer, "_amp_stash"):
                 if TorchTrainer.model.wrappers.is_model_wrapper(model):
                     model = model.module
                 model, self.optimizer = apex_amp.initialize(
@@ -192,7 +192,8 @@ class ApexOptimWrapper(OptimWrapper):
                     num_losses=self.num_losses,
                     verbosity=self.verbosity,
                     min_loss_scale=self.min_loss_scale,
-                    max_loss_scale=self.max_loss_scale)
+                    max_loss_scale=self.max_loss_scale,
+                )
                 # loading apex_amp state_dict after initialization of apex_amp
                 if self._apex_amp_state_dict is not None:
                     apex_amp.load_state_dict(self._apex_amp_state_dict)

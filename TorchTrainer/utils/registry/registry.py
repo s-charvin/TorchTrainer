@@ -22,7 +22,7 @@ from TorchTrainer.config import Config
 
 
 class Registry:
-    """A registry to map strings to classes or functions."""
+    """一个注册表类，用于注册模块，可以通过注册名称获取模块"""
 
     def __init__(
         self,

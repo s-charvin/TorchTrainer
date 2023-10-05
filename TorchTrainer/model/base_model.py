@@ -149,17 +149,17 @@ class BaseModel(BaseModule):
         raise NotImplementedError
 
     def _set_device(self, device: torch.device) -> None:
-        """为 `BaseDataPreprocessor` 实例递归设置设备.
-        """
+        """为 `BaseDataPreprocessor` 实例递归设置设备."""
+
         def apply_fn(module):
             if not isinstance(module, BaseDataPreprocessor):
                 return
             if device is not None:
                 module._device = device
+
         self.apply(apply_fn)
 
     def to(self, *args, **kwargs) -> nn.Module:
-
         if args and isinstance(args[0], str) and "npu" in args[0]:
             args = tuple([list(args)[0].replace("npu", torch.npu.native_device)])
         if kwargs and "npu" in str(kwargs.get("device", "")):

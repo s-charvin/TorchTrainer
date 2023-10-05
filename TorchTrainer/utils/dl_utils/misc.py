@@ -1,4 +1,3 @@
-
 import pkgutil
 from typing import Optional, Tuple, Union
 
@@ -10,24 +9,18 @@ from ..misc import is_tuple_of
 from .parrots_wrapper import _BatchNorm, _InstanceNorm
 
 
-def is_norm(layer: nn.Module,
-            exclude: Optional[Union[type, Tuple[type]]] = None) -> bool:
-    """Check if a layer is a normalization layer.
-
-    Args:
-        layer (nn.Module): The layer to be checked.
-        exclude (type, tuple[type], optional): Types to be excluded.
-
-    Returns:
-        bool: Whether the layer is a norm layer.
-    """
+def is_norm(
+    layer: nn.Module, exclude: Optional[Union[type, Tuple[type]]] = None
+) -> bool:
+    """检查一个层是否是一个归一化层."""
     if exclude is not None:
         if not isinstance(exclude, tuple):
-            exclude = (exclude, )
+            exclude = (exclude,)
         if not is_tuple_of(exclude, type):
             raise TypeError(
                 f'"exclude" must be either None or type or a tuple of types, '
-                f'but got {type(exclude)}: {exclude}')
+                f"but got {type(exclude)}: {exclude}"
+            )
 
     if exclude and isinstance(layer, exclude):
         return False
@@ -36,11 +29,14 @@ def is_norm(layer: nn.Module,
     return isinstance(layer, all_norm_bases)
 
 
-def tensor2imgs(tensor: torch.Tensor,
-                mean: Optional[Tuple[float, float, float]] = None,
-                std: Optional[Tuple[float, float, float]] = None,
-                to_bgr: bool = True):
-    """Convert tensor to 3-channel images or 1-channel gray images.
+def tensor2imgs(
+    tensor: torch.Tensor,
+    mean: Optional[Tuple[float, float, float]] = None,
+    std: Optional[Tuple[float, float, float]] = None,
+    to_bgr: bool = True,
+):
+    """将张量转换为 3 通道图像或 1 通道灰度图像.
+
 
     Args:
         tensor (torch.Tensor): Tensor that contains multiple images, shape (
@@ -64,11 +60,12 @@ def tensor2imgs(tensor: torch.Tensor,
     channels = tensor.size(1)
     assert channels in [1, 3]
     if mean is None:
-        mean = (0, ) * channels
+        mean = (0,) * channels
     if std is None:
-        std = (1, ) * channels
-    assert (channels == len(mean) == len(std) == 3) or \
-           (channels == len(mean) == len(std) == 1 and not to_bgr)
+        std = (1,) * channels
+    assert (channels == len(mean) == len(std) == 3) or (
+        channels == len(mean) == len(std) == 1 and not to_bgr
+    )
     mean = tensor.new_tensor(mean).view(1, -1)
     std = tensor.new_tensor(std).view(1, -1)
     tensor = tensor.permute(0, 2, 3, 1) * std + mean
@@ -80,31 +77,10 @@ def tensor2imgs(tensor: torch.Tensor,
 
 
 def has_batch_norm(model: nn.Module) -> bool:
-    """Detect whether model has a BatchNormalization layer.
-
-    Args:
-        model (nn.Module): training model.
-
-    Returns:
-        bool: whether model has a BatchNormalization layer
-    """
+    """检测一个模型是否有 BatchNormalization 层."""
     if isinstance(model, _BatchNorm):
         return True
     for m in model.children():
         if has_batch_norm(m):
             return True
     return False
-
-
-def mmcv_full_available() -> bool:
-    """Check whether mmcv-full is installed.
-
-    Returns:
-        bool: True if mmcv-full is installed else False.
-    """
-    try:
-        import mmcv
-    except ImportError:
-        return False
-    ext_loader = pkgutil.find_loader('mmcv._ext')
-    return ext_loader is not None

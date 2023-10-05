@@ -1,4 +1,3 @@
-
 import logging
 import os
 import os.path as osp
@@ -11,27 +10,19 @@ from typing import Optional, Union
 
 from termcolor import colored
 
-from TorchTrainer.utils import ManagerMixin
+from TorchTrainer.utils import GlobalManager
 from TorchTrainer.utils.manager import _accquire_lock, _release_lock
 
 
 class FilterDuplicateWarning(logging.Filter):
-    """Filter the repeated warning message.
+    """过滤重复的警告信息."""
 
-    Args:
-        name (str): name of the filter.
-    """
-
-    def __init__(self, name: str = 'TorchTrainer'):
+    def __init__(self, name: str = "TorchTrainer"):
         super().__init__(name)
         self.seen: set = set()
 
     def filter(self, record: LogRecord) -> bool:
-        """Filter the repeated warning message.
-
-        Args:
-            record (LogRecord): The log record.
-
+        """过滤重复的警告信息.
         Returns:
             bool: Whether to output the log record.
         """
@@ -44,10 +35,9 @@ class FilterDuplicateWarning(logging.Filter):
         return False
 
 
-class MMFormatter(logging.Formatter):
-    """Colorful format for MMLogger. If the log level is error, the logger will
-    additionally output the location of the code.
-
+class Formatter(logging.Formatter):
+    """GLogger的格式化类.
+    如果日志级别为 error, logger 还会额外输出代码的位置
     Args:
         color (bool): Whether to use colorful format. filehandler is not
             allowed to use color format, otherwise it will be garbled.
@@ -56,32 +46,34 @@ class MMFormatter(logging.Formatter):
         **kwargs: Keyword arguments passed to
             :meth:`logging.Formatter.__init__`.
     """
+
     _color_mapping: dict = dict(
-        ERROR='red', WARNING='yellow', INFO='white', DEBUG='green')
+        ERROR="red", WARNING="yellow", INFO="white", DEBUG="green"
+    )
 
     def __init__(self, color: bool = True, blink: bool = False, **kwargs):
         super().__init__(**kwargs)
-        assert not (not color and blink), (
-            'blink should only be available when color is True')
+        assert not (
+            not color and blink
+        ), "blink should only be available when color is True"
         # Get prefix format according to color.
-        error_prefix = self._get_prefix('ERROR', color, blink=True)
-        warn_prefix = self._get_prefix('WARNING', color, blink=True)
-        info_prefix = self._get_prefix('INFO', color, blink)
-        debug_prefix = self._get_prefix('DEBUG', color, blink)
+        error_prefix = self._get_prefix("ERROR", color, blink=True)
+        warn_prefix = self._get_prefix("WARNING", color, blink=True)
+        info_prefix = self._get_prefix("INFO", color, blink)
+        debug_prefix = self._get_prefix("DEBUG", color, blink)
 
         # Config output format.
-        self.err_format = (f'%(asctime)s - %(name)s - {error_prefix} - '
-                           '%(pathname)s - %(funcName)s - %(lineno)d - '
-                           '%(message)s')
-        self.warn_format = (f'%(asctime)s - %(name)s - {warn_prefix} - %('
-                            'message)s')
-        self.info_format = (f'%(asctime)s - %(name)s - {info_prefix} - %('
-                            'message)s')
-        self.debug_format = (f'%(asctime)s - %(name)s - {debug_prefix} - %('
-                             'message)s')
+        self.err_format = (
+            f"%(asctime)s - %(name)s - {error_prefix} - "
+            "%(pathname)s - %(funcName)s - %(lineno)d - "
+            "%(message)s"
+        )
+        self.warn_format = f"%(asctime)s - %(name)s - {warn_prefix} - %(" "message)s"
+        self.info_format = f"%(asctime)s - %(name)s - {info_prefix} - %(" "message)s"
+        self.debug_format = f"%(asctime)s - %(name)s - {debug_prefix} - %(" "message)s"
 
     def _get_prefix(self, level: str, color: bool, blink=False) -> str:
-        """Get the prefix of the target log level.
+        """获得目标日志级别的前缀.
 
         Args:
             level (str): log level.
@@ -92,17 +84,16 @@ class MMFormatter(logging.Formatter):
             str: The plain or colorful prefix.
         """
         if color:
-            attrs = ['underline']
+            attrs = ["underline"]
             if blink:
-                attrs.append('blink')
+                attrs.append("blink")
             prefix = colored(level, self._color_mapping[level], attrs=attrs)
         else:
             prefix = level
         return prefix
 
     def format(self, record: LogRecord) -> str:
-        """Override the `logging.Formatter.format`` method `. Output the
-        message according to the specified log level.
+        """重写 ``logging.Formatter.format`` 方法. 根据日志级别输出信息.
 
         Args:
             record (LogRecord): A LogRecord instance represents an event being
@@ -124,42 +115,20 @@ class MMFormatter(logging.Formatter):
         return result
 
 
-class MMLogger(Logger, ManagerMixin):
-    """Formatted logger used to record messages.
+class GLogger(Logger, GlobalManager):
+    """用于记录日志的格式化类.
 
-    ``MMLogger`` can create formatted logger to log message with different
-    log levels and get instance in the same way as ``ManagerMixin``.
-    ``MMLogger`` has the following features:
+    ``GLogger`` 可以创建格式化的日志记录器, 以不同的日志级别记录日志消息, 并以与 ``GlobalManager`` 相同的方式获取全局实例.
+    ``GLogger`` 具有以下功能:
+        - 分布式日志存储, ``GLogger`` 可以根据 `log_file` 选择是否保存不同排名的日志.
+        - 在终端上显示时, 具有不同颜色和格式的不同日志级别的消息.
 
-    - Distributed log storage, ``MMLogger`` can choose whether to save log of
-      different ranks according to `log_file`.
-    - Message with different log levels will have different colors and format
-      when displayed on terminal.
-
-    Note:
-        - The `name` of logger and the ``instance_name`` of ``MMLogger`` could
-          be different. We can only get ``MMLogger`` instance by
-          ``MMLogger.get_instance`` but not ``logging.getLogger``. This feature
-          ensures ``MMLogger`` will not be incluenced by third-party logging
-          config.
-        - Different from ``logging.Logger``, ``MMLogger`` will not log warning
-          or error message without ``Handler``.
-
-    Examples:
-        >>> logger = MMLogger.get_instance(name='MMLogger',
-        >>>                                logger_name='Logger')
-        >>> # Although logger has name attribute just like `logging.Logger`
-        >>> # We cannot get logger instance by `logging.getLogger`.
-        >>> assert logger.name == 'Logger'
-        >>> assert logger.instance_name = 'MMLogger'
-        >>> assert id(logger) != id(logging.getLogger('Logger'))
-        >>> # Get logger that do not store logs.
-        >>> logger1 = MMLogger.get_instance('logger1')
-        >>> # Get logger only save rank0 logs.
-        >>> logger2 = MMLogger.get_instance('logger2', log_file='out.log')
-        >>> # Get logger only save multiple ranks logs.
-        >>> logger3 = MMLogger.get_instance('logger3', log_file='out.log',
-        >>>                                 distributed=True)
+    注意:
+        - 日志记录器的 `name` 和 ``GLogger`` 的 ``instance_name`` 可能不同.
+          只能通过 ``GLogger.get_instance`` 而不是 ``logging.getLogger``来获取 ``GLogger`` 实例.
+          此功能确保 ``GLogger`` 不会受到第三方日志配置的影响.
+        - 与 ``logging.Logger`` 不同, ``GLogger`` 不会记录没有 ``Handler``
+            的警告或错误消息.
 
     Args:
         name (str): Global instance name.
@@ -175,15 +144,17 @@ class MMLogger(Logger, ManagerMixin):
             false.
     """
 
-    def __init__(self,
-                 name: str,
-                 logger_name='TorchTrainer',
-                 log_file: Optional[str] = None,
-                 log_level: Union[int, str] = 'INFO',
-                 file_mode: str = 'w',
-                 distributed=False):
+    def __init__(
+        self,
+        name: str,
+        logger_name="TorchTrainer",
+        log_file: Optional[str] = None,
+        log_level: Union[int, str] = "INFO",
+        file_mode: str = "w",
+        distributed=False,
+    ):
         Logger.__init__(self, logger_name)
-        ManagerMixin.__init__(self, name)
+        GlobalManager.__init__(self, name)
         # Get rank in DDP mode.
         if isinstance(log_level, str):
             log_level = logging._nameToLevel[log_level]
@@ -195,8 +166,7 @@ class MMLogger(Logger, ManagerMixin):
         stream_handler = logging.StreamHandler(stream=sys.stdout)
         # `StreamHandler` record month, day, hour, minute, and second
         # timestamp.
-        stream_handler.setFormatter(
-            MMFormatter(color=True, datefmt='%m/%d %H:%M:%S'))
+        stream_handler.setFormatter(Formatter(color=True, datefmt="%m/%d %H:%M:%S"))
         # Only rank0 `StreamHandler` will log messages below error level.
         if global_rank == 0:
             stream_handler.setLevel(log_level)
@@ -207,18 +177,22 @@ class MMLogger(Logger, ManagerMixin):
 
         if log_file is not None:
             world_size = _get_world_size()
-            is_distributed = (log_level <= logging.DEBUG
-                              or distributed) and world_size > 1
+            is_distributed = (
+                log_level <= logging.DEBUG or distributed
+            ) and world_size > 1
             if is_distributed:
                 filename, suffix = osp.splitext(osp.basename(log_file))
                 hostname = _get_host_info()
                 if hostname:
-                    filename = (f'{filename}_{hostname}_device{device_id}_'
-                                f'rank{global_rank}{suffix}')
+                    filename = (
+                        f"{filename}_{hostname}_device{device_id}_"
+                        f"rank{global_rank}{suffix}"
+                    )
                 else:
                     # Omit hostname if it is empty
-                    filename = (f'{filename}_device{device_id}_'
-                                f'rank{global_rank}{suffix}')
+                    filename = (
+                        f"{filename}_device{device_id}_" f"rank{global_rank}{suffix}"
+                    )
                 log_file = osp.join(osp.dirname(log_file), filename)
             # Save multi-ranks logs if distributed is True. The logs of rank0
             # will always be saved.
@@ -232,7 +206,8 @@ class MMLogger(Logger, ManagerMixin):
                 # and second timestamp. file_handler will only record logs
                 # without color to avoid garbled code saved in files.
                 file_handler.setFormatter(
-                    MMFormatter(color=False, datefmt='%Y/%m/%d %H:%M:%S'))
+                    Formatter(color=False, datefmt="%Y/%m/%d %H:%M:%S")
+                )
                 file_handler.setLevel(log_level)
                 file_handler.addFilter(FilterDuplicateWarning(logger_name))
                 self.handlers.append(file_handler)
@@ -243,27 +218,19 @@ class MMLogger(Logger, ManagerMixin):
         return self._log_file
 
     @classmethod
-    def get_current_instance(cls) -> 'MMLogger':
-        """Get latest created ``MMLogger`` instance.
-
-        :obj:`MMLogger` can call :meth:`get_current_instance` before any
-        instance has been created, and return a logger with the instance name
-        "TorchTrainer".
-
+    def get_current_instance(cls) -> "GLogger":
+        """获取最新创建的 ``GLogger`` 实例. ``GLogger`` 可以在创建任何实例之前调用 ``get_current_instance`` 并返回一个实例名为 "TorchTrainer" 的日志记录器.
         Returns:
-            MMLogger: Configured logger instance.
+            GLogger: Configured logger instance.
         """
         if not cls._instance_dict:
-            cls.get_instance('TorchTrainer')
+            cls.get_instance("TorchTrainer")
         return super().get_current_instance()
 
     def callHandlers(self, record: LogRecord) -> None:
-        """Pass a record to all relevant handlers.
-
-        Override ``callHandlers`` method in ``logging.Logger`` to avoid
-        multiple warning messages in DDP mode. Loop through all handlers of
-        the logger instance and its parents in the logger hierarchy. If no
-        handler was found, the record will not be output.
+        """将日志记录传递给所有相关的处理程序.
+        在 ``logging.Logger`` 中重写 ``callHandlers`` 方法, 以避免在 DDP 模式下出现多个警告消息.
+        循环遍历日志记录器实例及其父级在日志记录器层次结构中的所有处理程序. 如果未找到处理程序, 则不会输出记录.
 
         Args:
             record (LogRecord): A ``LogRecord`` instance contains logged
@@ -274,28 +241,24 @@ class MMLogger(Logger, ManagerMixin):
                 handler.handle(record)
 
     def setLevel(self, level):
-        """Set the logging level of this logger.
-
-        If ``logging.Logger.selLevel`` is called, all ``logging.Logger``
-        instances managed by ``logging.Manager`` will clear the cache. Since
-        ``MMLogger`` is not managed by ``logging.Manager`` anymore,
-        ``MMLogger`` should override this method to clear caches of all
-        ``MMLogger`` instance which is managed by :obj:`ManagerMixin`.
+        """设置日志记录器的日志级别.
+        如果调用 ``logging.Logger.selLevel``, ``logging.Manager`` 管理的所有 ``logging.Logger`` 实例都将清除缓存.
+        由于 ``GLogger`` 不再由 ``logging.Manager`` 管理, 因此 ``GLogger`` 应重写此方法, 以清除 ``GlobalManager`` 管理的所有 ``GLogger`` 实例的缓存.
 
         level must be an int or a str.
         """
         self.level = logging._checkLevel(level)
         _accquire_lock()
         # The same logic as `logging.Manager._clear_cache`.
-        for logger in MMLogger._instance_dict.values():
+        for logger in GLogger._instance_dict.values():
             logger._cache.clear()
         _release_lock()
 
 
-def print_log(msg,
-              logger: Optional[Union[Logger, str]] = None,
-              level=logging.INFO) -> None:
-    """Print a log message.
+def print_log(
+    msg, logger: Optional[Union[Logger, str]] = None, level=logging.INFO
+) -> None:
+    """用于在终端上打印日志消息的函数.
 
     Args:
         msg (str): The message to be logged.
@@ -316,29 +279,30 @@ def print_log(msg,
         print(msg)
     elif isinstance(logger, logging.Logger):
         logger.log(level, msg)
-    elif logger == 'silent':
+    elif logger == "silent":
         pass
-    elif logger == 'current':
-        logger_instance = MMLogger.get_current_instance()
+    elif logger == "current":
+        logger_instance = GLogger.get_current_instance()
         logger_instance.log(level, msg)
     elif isinstance(logger, str):
         # If the type of `logger` is `str`, but not with value of `current` or
         # `silent`, we assume it indicates the name of the logger. If the
         # corresponding logger has not been created, `print_log` will raise
         # a `ValueError`.
-        if MMLogger.check_instance_created(logger):
-            logger_instance = MMLogger.get_instance(logger)
+        if GLogger.check_instance_created(logger):
+            logger_instance = GLogger.get_instance(logger)
             logger_instance.log(level, msg)
         else:
-            raise ValueError(f'MMLogger: {logger} has not been created!')
+            raise ValueError(f"GLogger: {logger} has not been created!")
     else:
         raise TypeError(
-            '`logger` should be either a logging.Logger object, str, '
-            f'"silent", "current" or None, but got {type(logger)}')
+            "`logger` should be either a logging.Logger object, str, "
+            f'"silent", "current" or None, but got {type(logger)}'
+        )
 
 
 def _get_world_size():
-    """Support using logging module without torch."""
+    """获得当前机器的总排名. 如果没有 torch, 则返回 1."""
     try:
         # requires torch
         from TorchTrainer.utils.dist import get_world_size
@@ -349,7 +313,7 @@ def _get_world_size():
 
 
 def _get_rank():
-    """Support using logging module without torch."""
+    """获得当前机器的排名. 如果没有 torch, 则返回 0."""
     try:
         # requires torch
         from TorchTrainer.utils.dist import get_rank
@@ -360,22 +324,23 @@ def _get_rank():
 
 
 def _get_device_id():
-    """Get device id of current machine."""
+    """获得当前机器的设备 id. 如果没有 torch, 则返回 0."""
+
     try:
         import torch
     except ImportError:
         return 0
     else:
-        local_rank = int(os.getenv('LOCAL_RANK', '0'))
+        local_rank = int(os.getenv("LOCAL_RANK", "0"))
         # TODO: return device id of npu and mlu.
         if not torch.cuda.is_available():
             return local_rank
-        cuda_visible_devices = os.getenv('CUDA_VISIBLE_DEVICES', None)
+        cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES", None)
         if cuda_visible_devices is None:
             num_device = torch.cuda.device_count()
             cuda_visible_devices = list(range(num_device))
         else:
-            cuda_visible_devices = cuda_visible_devices.split(',')
+            cuda_visible_devices = cuda_visible_devices.split(",")
         try:
             return int(cuda_visible_devices[local_rank])
         except ValueError:
@@ -385,15 +350,12 @@ def _get_device_id():
 
 
 def _get_host_info() -> str:
-    """Get hostname and username.
-
-    Return empty string if exception raised, e.g. ``getpass.getuser()`` will
-    lead to error in docker container
+    """获得当前机器的主机名和用户名.
     """
-    host = ''
+    host = ""
     try:
-        host = f'{getuser()}@{gethostname()}'
+        host = f"{getuser()}@{gethostname()}"
     except Exception as e:
-        warnings.warn(f'Host or user not found: {str(e)}')
+        warnings.warn(f"Host or user not found: {str(e)}")
     finally:
         return host

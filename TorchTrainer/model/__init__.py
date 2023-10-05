@@ -31,8 +31,8 @@ from .weight_init import (
     xavier_init,
 )
 from .wrappers import (
-    MMDistributedDataParallel,
-    MMSeparateDistributedDataParallel,
+    TTDistributedDataParallel,
+    TTSeparateDistributedDataParallel,
     is_model_wrapper,
 )
 
@@ -44,27 +44,19 @@ from .data_preprocessor import BaseDataPreprocessor, ImgDataPreprocessor
 __all__ = [
     "BaseModule",
     "BaseModel",
-    
-    "MMDistributedDataParallel",
-    "MMSeparateDistributedDataParallel",
+    "TTDistributedDataParallel",
+    "TTSeparateDistributedDataParallel",
     "is_model_wrapper",
-
-
     "BaseDataPreprocessor",
     "ImgDataPreprocessor",
-
-    
-    
     "stack_batch",
     "merge_dict",
     "detect_anomalous_params",
     "revert_sync_batchnorm",
     "convert_sync_batchnorm",
-
     "ModuleList",
     "ModuleDict",
     "Sequential",
-
     # 参数初始化
     "constant_init",
     "xavier_init",
