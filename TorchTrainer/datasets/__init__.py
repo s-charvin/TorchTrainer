@@ -5,7 +5,7 @@ from .utils import (
     input_collate,
 )
 from .emodb import EMODB
-from .iemocap import IEMOCAP
+from .iemocap import IEMOCAP, IEMOCAP4C, IEMOCAP6C, IEMOCAP7C
 from .transforms import *
 
 __all__ = [
@@ -18,4 +18,7 @@ __all__ = [
     # 情感数据集
     "EMODB",
     "IEMOCAP",
+    "IEMOCAP4C",
+    "IEMOCAP6C",
+    "IEMOCAP7C"
 ]
