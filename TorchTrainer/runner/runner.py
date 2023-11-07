@@ -161,7 +161,7 @@ class Runner:
 
         # 参数检查: 学习率调整器(没有 optim_wrapper 时, param_scheduler 应该为 None)
         if (
-            param_scheduler is not None and self.optim_wrapper is None
+            param_scheduler is not None and optim_wrapper is None
         ):  # 如果不需要调整优化器的学习率、动量或其他参数, param_scheduler 可以为 None
             raise ValueError(
                 "param_scheduler should be None when optim_wrapper is None, "
@@ -254,7 +254,7 @@ class Runner:
 
         # 参数初始化: 优化器(optim_wrapper) 和 优化器参数调度器(param_scheduler)
 
-        self.optim_wrapper: Optional[Union[OptimWrapper, dict]]
+
         self.optim_wrapper = optim_wrapper
         self.auto_scale_lr = auto_scale_lr
         self.param_schedulers = param_scheduler
