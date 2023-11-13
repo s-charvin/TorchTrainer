@@ -262,13 +262,8 @@ class BaseDataset(Dataset):
 
         return data_info
 
-    def save(self, name: str) -> Union[dict, List[dict]]:
+    def save(self, file_path: str) -> Union[dict, List[dict]]:
         """save dataset info to local file."""
-        if isfile(self.root):
-            file_path = osp.join(osp.dirname(self.root), name, ".pkl")
-        else:
-            file_path = osp.join(self.root, name, ".pkl")
-
         dump(
             {"data_list": self.data_list, "metainfo": self.metainfo},
             file_path,

@@ -121,10 +121,9 @@ class Runner:
         test_dataloader: Optional[Union[DataLoader, Dict]] = None,  # 测试数据加载器
         test_cfg: Optional[Dict] = None,  # 测试循环配置
         test_evaluator: Optional[Union[Evaluator, Dict, List]] = None,  # 测试评估器
-        default_hooks: Optional[Dict[str, Union[Hook, Dict]]] = None,  # 默认钩子
         custom_hooks: Optional[List[Union[Hook, Dict]]] = None,  # 自定义钩子
-        load_from: Optional[str] = None,  # 加载模型的路径
         resume: bool = False,  # 是否从断点继续训练
+        load_from: Optional[str] = None,  # 加载模型的路径
         launcher: str = "none",  # 启动器
         env_cfg: Dict = dict(dist_cfg=dict(backend="nccl")),  # 环境配置
         log_processor: Optional[Dict] = None,  # 日志处理器
@@ -161,7 +160,7 @@ class Runner:
 
         # 参数检查: 学习率调整器(没有 optim_wrapper 时, param_scheduler 应该为 None)
         if (
-            param_scheduler is not None and self.optim_wrapper is None
+            param_scheduler is not None and optim_wrapper is None
         ):  # 如果不需要调整优化器的学习率、动量或其他参数, param_scheduler 可以为 None
             raise ValueError(
                 "param_scheduler should be None when optim_wrapper is None, "
@@ -193,8 +192,7 @@ class Runner:
                 f"test_dataloader={test_dataloader}, test_cfg={test_cfg}, "
                 f"test_evaluator={test_evaluator}"
             )
-        
-        
+
         # 参数初始化: 多进程启动方式的控制参数(_distributed)
         self._launcher = launcher
         if self._launcher == "none":
@@ -254,7 +252,6 @@ class Runner:
 
         # 参数初始化: 优化器(optim_wrapper) 和 优化器参数调度器(param_scheduler)
 
-        self.optim_wrapper: Optional[Union[OptimWrapper, dict]]
         self.optim_wrapper = optim_wrapper
         self.auto_scale_lr = auto_scale_lr
         self.param_schedulers = param_scheduler
@@ -270,7 +267,7 @@ class Runner:
 
         # 对象构造: 构造钩子(hooks)
         self._hooks: List[Hook] = []
-        self.register_hooks(default_hooks, custom_hooks)
+        self.register_hooks(custom_hooks)
 
         self.logger.info(
             f"Hooks will be executed in the following "
@@ -293,31 +290,30 @@ class Runner:
         """
         cfg = copy.deepcopy(cfg)
         runner = cls(
-            model=cfg["model"],
             work_dir=cfg["work_dir"],
+            experiment_name=cfg.get("experiment_name"),
+            model=cfg["model"],
+            data_preprocessor=cfg.get("data_preprocessor"),
             train_dataloader=cfg.get("train_dataloader"),
-            val_dataloader=cfg.get("val_dataloader"),
-            test_dataloader=cfg.get("test_dataloader"),
-            train_cfg=cfg.get("train_cfg"),
-            val_cfg=cfg.get("val_cfg"),
-            test_cfg=cfg.get("test_cfg"),
-            auto_scale_lr=cfg.get("auto_scale_lr"),
             optim_wrapper=cfg.get("optim_wrapper"),
             param_scheduler=cfg.get("param_scheduler"),
+            auto_scale_lr=cfg.get("auto_scale_lr"),
+            train_cfg=cfg.get("train_cfg"),
+            val_dataloader=cfg.get("val_dataloader"),
+            val_cfg=cfg.get("val_cfg"),
             val_evaluator=cfg.get("val_evaluator"),
+            test_dataloader=cfg.get("test_dataloader"),
+            test_cfg=cfg.get("test_cfg"),
             test_evaluator=cfg.get("test_evaluator"),
-            default_hooks=cfg.get("default_hooks"),
             custom_hooks=cfg.get("custom_hooks"),
-            data_preprocessor=cfg.get("data_preprocessor"),
-            load_from=cfg.get("load_from"),
             resume=cfg.get("resume", False),
+            load_from=cfg.get("load_from"),
             launcher=cfg.get("launcher", "none"),
             env_cfg=cfg.get("env_cfg"),
             log_processor=cfg.get("log_processor"),
             log_level=cfg.get("log_level", "INFO"),
             visualizer=cfg.get("visualizer"),
             randomness=cfg.get("randomness", dict(seed=None)),
-            experiment_name=cfg.get("experiment_name"),
             cfg=cfg,
         )
 
@@ -400,8 +396,8 @@ class Runner:
 
         log_cfg = dict(log_level=log_level, log_file=log_file, **kwargs)
         log_cfg.setdefault("name", self._experiment_name)
-        # 在PyTorch 2.0中, `torch.compile`可能会意外关闭所有用户定义的处理程序. 
-        # 使用文件模式'a'可以帮助防止 FileHandler 异常终止, 并确保日志文件在运行器的生命周期内能够持续更新. 
+        # 在PyTorch 2.0中, `torch.compile`可能会意外关闭所有用户定义的处理程序.
+        # 使用文件模式'a'可以帮助防止 FileHandler 异常终止, 并确保日志文件在运行器的生命周期内能够持续更新.
         log_cfg.setdefault("file_mode", "a")
 
         return GLogger.get_instance(**log_cfg)
@@ -522,7 +518,7 @@ class Runner:
                     model = convert_sync_batchnorm(model, sync_bn)
                 except ValueError as e:
                     self.logger.error(
-                        'cfg.sync_bn should be "torch"' f', but got {sync_bn}'
+                        'cfg.sync_bn should be "torch"' f", but got {sync_bn}"
                     )
                     raise e
         if model_wrapper_cfg is None:
@@ -712,7 +708,7 @@ class Runner:
 
         - 当仅使用一个优化器时, 返回一个含有指定参数调度器的列表.
         - 当使用多个优化器时, 返回一个字典, 其中 key 与优化器对应, value 对应调度器列表.
-        - 需要注意的是, 如果希望不同的优化器使用不同的参数调度器来更新优化器的超参数, 输入参数 scheduler 必须是一个与优化器参数保持key一致的字典. 否则使用相同的参数调度器来更新所有优化器的超参数. 
+        - 需要注意的是, 如果希望不同的优化器使用不同的参数调度器来更新优化器的超参数, 输入参数 scheduler 必须是一个与优化器参数保持key一致的字典. 否则使用相同的参数调度器来更新所有优化器的超参数.
 
         Examples:
             >>> scheduler_cfg = dict(type='MultiStepLR', milestones=[1, 2])
@@ -1257,15 +1253,14 @@ class Runner:
         by_epoch: bool = True,
         backend_args: Optional[dict] = None,
     ):
-        """Save checkpoints
-        """
+        """Save checkpoints"""
         if meta is None:
             meta = {}
         elif not isinstance(meta, dict):
             raise TypeError(f"meta should be a dict or None, but got {type(meta)}")
 
         if by_epoch:
-            # self.epoch 在调用 `self.call_hook('after_train_epoch')` 后增加1, 
+            # self.epoch 在调用 `self.call_hook('after_train_epoch')` 后增加1,
             # 但是 `save_checkpoint` 是由 `CheckpointHook` 的 `after_train_epoch` 方法调用的, 所以 `epoch` 应该是 `self.epoch + 1`.
             meta.setdefault("epoch", self.epoch + 1)
             meta.setdefault("iter", self.iter)
@@ -1538,9 +1533,7 @@ class Runner:
         if not inserted:
             self._hooks.insert(0, hook_obj)
 
-    def register_default_hooks(
-        self, hooks: Optional[Dict[str, Union[Hook, Dict]]] = None
-    ) -> None:
+    def register_default_hooks(self) -> None:
         """Register default hooks into hook list.
 
         ``hooks`` will be registered into runner to execute some default
@@ -1576,12 +1569,6 @@ class Runner:
                 checkpoint=dict(type='CheckpointHook', interval=1),
             )
 
-        If not None, ``hooks`` will be merged into ``default_hooks``.
-        If there are None value in default_hooks, the corresponding item will
-        be popped from ``default_hooks``::
-
-            hooks = dict(timer=None)
-
         The final registered default hooks will be :obj:`RuntimeInfoHook`,
         :obj:`DistSamplerSeedHook`, :obj:`LoggerHook`,
         :obj:`ParamSchedulerHook` and :obj:`CheckpointHook`.
@@ -1598,15 +1585,6 @@ class Runner:
             param_scheduler=dict(type="ParamSchedulerHook"),
             checkpoint=dict(type="CheckpointHook", interval=1),
         )
-        if hooks is not None:
-            for name, hook in hooks.items():
-                if name in default_hooks and hook is None:
-                    # remove hook from _default_hooks
-                    default_hooks.pop(name)
-                else:
-                    assert hook is not None
-                    default_hooks[name] = hook
-
         for hook in default_hooks.values():
             self.register_hook(hook)
 
@@ -1622,14 +1600,13 @@ class Runner:
 
     def register_hooks(
         self,
-        default_hooks: Optional[Dict[str, Union[Hook, Dict]]] = None,
-        custom_hooks: Optional[List[Union[Hook, Dict]]] = None,
+        hooks: Optional[List[Union[Hook, Dict]]] = None,
     ) -> None:
         """Register default hooks and custom hooks into hook list."""
-        self.register_default_hooks(default_hooks)
+        self.register_default_hooks()
 
-        if custom_hooks is not None:
-            self.register_custom_hooks(custom_hooks)
+        if hooks is not None:
+            self.register_custom_hooks(hooks)
 
     @master_only
     def dump_config(self) -> None:

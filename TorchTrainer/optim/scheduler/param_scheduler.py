@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------------------
 # Modified from https://github.com/pytorch/pytorch
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
@@ -46,25 +45,30 @@ class _ParamScheduler:
             Defaults to False.
     """
 
-    def __init__(self,
-                 optimizer: OptimizerType,
-                 param_name: str,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
-
+    def __init__(
+        self,
+        optimizer: OptimizerType,
+        param_name: str,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         # Attach optimizer
         if not isinstance(optimizer, (Optimizer, OptimWrapper)):
-            raise TypeError('``optimizer`` should be an Optimizer,'
-                            'but got {}'.format(type(optimizer).__name__))
+            raise TypeError(
+                "``optimizer`` should be an Optimizer,"
+                "but got {}".format(type(optimizer).__name__)
+            )
         self.optimizer = optimizer
         self.param_name = param_name
 
         if end <= begin:
-            raise ValueError('end should be larger than begin, but got'
-                             ' begin={}, end={}'.format(begin, end))
+            raise ValueError(
+                "end should be larger than begin, but got"
+                " begin={}, end={}".format(begin, end)
+            )
         self.begin = begin
         self.end = end
 
@@ -76,16 +80,16 @@ class _ParamScheduler:
             for group in optimizer.param_groups:
                 # If the param is never be scheduled, record the current value
                 # as the initial value.
-                group.setdefault(f'initial_{param_name}', group[param_name])
+                group.setdefault(f"initial_{param_name}", group[param_name])
         else:
             for i, group in enumerate(optimizer.param_groups):
-                if f'initial_{param_name}' not in group:
+                if f"initial_{param_name}" not in group:
                     raise KeyError(
                         f"param 'initial_{param_name}' is not specified "
-                        'in param_groups[{}] when resuming an optimizer'.
-                        format(i))
+                        "in param_groups[{}] when resuming an optimizer".format(i)
+                    )
         self.base_values = [
-            group[f'initial_{param_name}'] for group in optimizer.param_groups
+            group[f"initial_{param_name}"] for group in optimizer.param_groups
         ]
         self.last_step = last_step
 
@@ -93,7 +97,7 @@ class _ParamScheduler:
         # We would like to ensure that `scheduler.step()` is called after
         # `optimizer.step()`
         def with_counter(method: Callable):
-            if getattr(method, '_with_counter', False):
+            if getattr(method, "_with_counter", False):
                 # `optimizer.step()` has already been replaced, return.
                 return method
 
@@ -136,8 +140,7 @@ class _ParamScheduler:
             dict: scheduler state.
         """
         return {
-            key: value
-            for key, value in self.__dict__.items() if key != 'optimizer'
+            key: value for key, value in self.__dict__.items() if key != "optimizer"
         }
 
     def load_state_dict(self, state_dict: dict):
@@ -172,8 +175,9 @@ class _ParamScheduler:
         """
         if is_verbose:
             print_log(
-                f'Adjusting parameter value of group {group} to {value:.4e}.',
-                logger='current')
+                f"Adjusting parameter value of group {group} to {value:.4e}.",
+                logger="current",
+            )
 
     def step(self):
         """Adjusts the parameter value of each parameter group based on the
@@ -181,27 +185,29 @@ class _ParamScheduler:
         # Raise a warning if old pattern is detected
         # https://github.com/pytorch/pytorch/issues/20124
         if self._global_step == 0:
-            if not hasattr(self.optimizer.step, '_with_counter'):
+            if not hasattr(self.optimizer.step, "_with_counter"):
                 warnings.warn(
-                    'Seems like `optimizer.step()` has been overridden after '
-                    'parameter value scheduler initialization. Please, make '
-                    'sure to call `optimizer.step()` before '
-                    '`scheduler.step()`. See more details at '
-                    'https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate',
-                    UserWarning)
+                    "Seems like `optimizer.step()` has been overridden after "
+                    "parameter value scheduler initialization. Please, make "
+                    "sure to call `optimizer.step()` before "
+                    "`scheduler.step()`. See more details at "
+                    "https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate",
+                    UserWarning,
+                )
 
             # Just check if there were two first scheduler.step() calls
             # before optimizer.step()
             elif self.optimizer._global_step < 0:
                 warnings.warn(
-                    'Detected call of `scheduler.step()` before '
-                    '`optimizer.step()`. In PyTorch 1.1.0 and later, you '
-                    'should call them in the opposite order: '
-                    '`optimizer.step()` before `scheduler.step()`. '
-                    'Failure to do this will result in PyTorch skipping '
-                    'the first value of the parameter value schedule. '
-                    'See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate',
-                    UserWarning)
+                    "Detected call of `scheduler.step()` before "
+                    "`optimizer.step()`. In PyTorch 1.1.0 and later, you "
+                    "should call them in the opposite order: "
+                    "`optimizer.step()` before `scheduler.step()`. "
+                    "Failure to do this will result in PyTorch skipping "
+                    "the first value of the parameter value schedule. "
+                    "See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate",
+                    UserWarning,
+                )
         self._global_step += 1
 
         # Compute parameter value per param group in the effective range
@@ -244,16 +250,18 @@ class StepParamScheduler(_ParamScheduler):
             Defaults to False.
     """
 
-    def __init__(self,
-                 optimizer: OptimizerType,
-                 param_name: str,
-                 step_size: int,
-                 gamma: float = 0.1,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
+    def __init__(
+        self,
+        optimizer: OptimizerType,
+        param_name: str,
+        step_size: int,
+        gamma: float = 0.1,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         self.step_size = step_size
         self.gamma = gamma
         super().__init__(
@@ -263,24 +271,29 @@ class StepParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              step_size,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls,
+        *args,
+        step_size,
+        begin=0,
+        end=INF,
+        by_epoch=True,
+        epoch_length=None,
+        **kwargs,
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         step_size = step_size * epoch_length
         begin = int(begin * epoch_length)
@@ -292,17 +305,15 @@ class StepParamScheduler(_ParamScheduler):
             begin=begin,
             end=end,
             by_epoch=by_epoch,
-            **kwargs)
+            **kwargs,
+        )
 
     def _get_value(self):
         """Compute value using chainable form of the scheduler."""
         if (self.last_step == 0) or (self.last_step % self.step_size != 0):
-            return [
-                group[self.param_name] for group in self.optimizer.param_groups
-            ]
+            return [group[self.param_name] for group in self.optimizer.param_groups]
         return [
-            group[self.param_name] * self.gamma
-            for group in self.optimizer.param_groups
+            group[self.param_name] * self.gamma for group in self.optimizer.param_groups
         ]
 
 
@@ -332,16 +343,18 @@ class MultiStepParamScheduler(_ParamScheduler):
             Defaults to False.
     """
 
-    def __init__(self,
-                 optimizer: OptimizerType,
-                 param_name: str,
-                 milestones: List[int],
-                 gamma: float = 0.1,
-                 last_step: int = -1,
-                 begin: int = 0,
-                 end: int = INF,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
+    def __init__(
+        self,
+        optimizer: OptimizerType,
+        param_name: str,
+        milestones: List[int],
+        gamma: float = 0.1,
+        last_step: int = -1,
+        begin: int = 0,
+        end: int = INF,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         self.milestones = Counter(milestones)
         self.gamma = gamma
         super().__init__(
@@ -351,24 +364,29 @@ class MultiStepParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              milestones,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls,
+        *args,
+        milestones,
+        begin=0,
+        end=INF,
+        by_epoch=True,
+        epoch_length=None,
+        **kwargs,
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         milestones = [i * epoch_length for i in milestones]
         begin = int(begin * epoch_length)
@@ -380,17 +398,15 @@ class MultiStepParamScheduler(_ParamScheduler):
             begin=begin,
             end=end,
             by_epoch=by_epoch,
-            **kwargs)
+            **kwargs,
+        )
 
     def _get_value(self):
         """Compute value using chainable form of the scheduler."""
         if self.last_step not in self.milestones:
-            return [
-                group[self.param_name] for group in self.optimizer.param_groups
-            ]
+            return [group[self.param_name] for group in self.optimizer.param_groups]
         return [
-            group[self.param_name] *
-            self.gamma**self.milestones[self.last_step]
+            group[self.param_name] * self.gamma ** self.milestones[self.last_step]
             for group in self.optimizer.param_groups
         ]
 
@@ -421,18 +437,19 @@ class ConstantParamScheduler(_ParamScheduler):
             Defaults to False.
     """
 
-    def __init__(self,
-                 optimizer: OptimizerType,
-                 param_name: str,
-                 factor: float = 1.0 / 3,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
+    def __init__(
+        self,
+        optimizer: OptimizerType,
+        param_name: str,
+        factor: float = 1.0 / 3,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         if factor > 1.0 or factor < 0:
-            raise ValueError(
-                'Constant multiplicative factor should between 0 and 1.')
+            raise ValueError("Constant multiplicative factor should between 0 and 1.")
 
         self.factor = factor
         self.total_iters = end - begin - 1
@@ -443,23 +460,22 @@ class ConstantParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls, *args, begin=0, end=INF, by_epoch=True, epoch_length=None, **kwargs
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         begin = int(begin * epoch_length)
         if end != INF:
@@ -474,11 +490,8 @@ class ConstantParamScheduler(_ParamScheduler):
                 for group in self.optimizer.param_groups
             ]
 
-        if (self.last_step > self.total_iters
-                or (self.last_step != self.total_iters)):
-            return [
-                group[self.param_name] for group in self.optimizer.param_groups
-            ]
+        if self.last_step > self.total_iters or (self.last_step != self.total_iters):
+            return [group[self.param_name] for group in self.optimizer.param_groups]
 
         if self.last_step == self.total_iters:
             return [
@@ -509,15 +522,17 @@ class ExponentialParamScheduler(_ParamScheduler):
             Defaults to False.
     """
 
-    def __init__(self,
-                 optimizer: OptimizerType,
-                 param_name: str,
-                 gamma: float,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
+    def __init__(
+        self,
+        optimizer: OptimizerType,
+        param_name: str,
+        gamma: float,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         self.gamma = gamma
         super().__init__(
             optimizer,
@@ -526,23 +541,22 @@ class ExponentialParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls, *args, begin=0, end=INF, by_epoch=True, epoch_length=None, **kwargs
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         begin = int(begin * epoch_length)
         if end != INF:
@@ -552,12 +566,9 @@ class ExponentialParamScheduler(_ParamScheduler):
     def _get_value(self):
         """Compute value using chainable form of the scheduler."""
         if self.last_step == 0:
-            return [
-                group[self.param_name] for group in self.optimizer.param_groups
-            ]
+            return [group[self.param_name] for group in self.optimizer.param_groups]
         return [
-            group[self.param_name] * self.gamma
-            for group in self.optimizer.param_groups
+            group[self.param_name] * self.gamma for group in self.optimizer.param_groups
         ]
 
 
@@ -616,22 +627,25 @@ class CosineAnnealingParamScheduler(_ParamScheduler):
         https://arxiv.org/abs/1608.03983
     """
 
-    def __init__(self,
-                 optimizer: Union[Optimizer, OptimWrapper],
-                 param_name: str,
-                 T_max: Optional[int] = None,
-                 eta_min: Optional[float] = None,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False,
-                 eta_min_ratio: Optional[float] = None):
+    def __init__(
+        self,
+        optimizer: Union[Optimizer, OptimWrapper],
+        param_name: str,
+        T_max: Optional[int] = None,
+        eta_min: Optional[float] = None,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+        eta_min_ratio: Optional[float] = None,
+    ):
         # To preserve backwards compatibility
         if eta_min is None and eta_min_ratio is None:
-            eta_min = 0.
-        assert (eta_min is None) ^ (eta_min_ratio is None), \
-            'Either `eta_min` or `eta_min_ratio should be specified'
+            eta_min = 0.0
+        assert (eta_min is None) ^ (
+            eta_min_ratio is None
+        ), "Either `eta_min` or `eta_min_ratio should be specified"
         self.T_max = T_max or (end - begin)
         self.eta_min = eta_min
         self.eta_min_ratio = eta_min_ratio
@@ -642,24 +656,29 @@ class CosineAnnealingParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              T_max=None,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls,
+        *args,
+        T_max=None,
+        begin=0,
+        end=INF,
+        by_epoch=True,
+        epoch_length=None,
+        **kwargs,
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         if T_max is not None:
             T_max = T_max * epoch_length
@@ -667,12 +686,8 @@ class CosineAnnealingParamScheduler(_ParamScheduler):
         if end != INF:
             end = int(end * epoch_length)
         return cls(
-            *args,
-            T_max=T_max,
-            begin=begin,
-            end=end,
-            by_epoch=by_epoch,
-            **kwargs)
+            *args, T_max=T_max, begin=begin, end=end, by_epoch=by_epoch, **kwargs
+        )
 
     def _get_value(self) -> list:
         """Compute value using chainable form of the scheduler."""
@@ -683,22 +698,24 @@ class CosineAnnealingParamScheduler(_ParamScheduler):
             return base_value * self.eta_min_ratio
 
         if self.last_step == 0:
-            return [
-                group[self.param_name] for group in self.optimizer.param_groups
-            ]
+            return [group[self.param_name] for group in self.optimizer.param_groups]
         elif (self.last_step - 1 - self.T_max) % (2 * self.T_max) == 0:
             return [
-                group[self.param_name] +
-                (base_value - _get_eta_min(base_value)) *
-                (1 - math.cos(math.pi / self.T_max)) / 2
-                for base_value, group in zip(self.base_values,
-                                             self.optimizer.param_groups)
+                group[self.param_name]
+                + (base_value - _get_eta_min(base_value))
+                * (1 - math.cos(math.pi / self.T_max))
+                / 2
+                for base_value, group in zip(
+                    self.base_values, self.optimizer.param_groups
+                )
             ]
-        return [(1 + math.cos(math.pi * self.last_step / self.T_max)) /
-                (1 + math.cos(math.pi * (self.last_step - 1) / self.T_max)) *
-                (group[self.param_name] - _get_eta_min(base_value)) +
-                _get_eta_min(base_value) for base_value, group in zip(
-                    self.base_values, self.optimizer.param_groups)]
+        return [
+            (1 + math.cos(math.pi * self.last_step / self.T_max))
+            / (1 + math.cos(math.pi * (self.last_step - 1) / self.T_max))
+            * (group[self.param_name] - _get_eta_min(base_value))
+            + _get_eta_min(base_value)
+            for base_value, group in zip(self.base_values, self.optimizer.param_groups)
+        ]
 
 
 @PARAM_SCHEDULERS.register_module()
@@ -732,23 +749,23 @@ class LinearParamScheduler(_ParamScheduler):
             Defaults to False.
     """
 
-    def __init__(self,
-                 optimizer: Union[Optimizer, OptimWrapper],
-                 param_name: str,
-                 start_factor: float = 1.0 / 3,
-                 end_factor: float = 1.0,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
+    def __init__(
+        self,
+        optimizer: Union[Optimizer, OptimWrapper],
+        param_name: str,
+        start_factor: float = 1.0 / 3,
+        end_factor: float = 1.0,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         if start_factor > 1.0 or start_factor < 0:
-            raise ValueError(
-                'Starting multiplicative factor should between 0 and 1.')
+            raise ValueError("Starting multiplicative factor should between 0 and 1.")
 
         if end_factor > 1.0 or end_factor < 0:
-            raise ValueError(
-                'Ending multiplicative factor should between 0 and 1.')
+            raise ValueError("Ending multiplicative factor should between 0 and 1.")
 
         self.start_factor = start_factor
         self.end_factor = end_factor
@@ -760,23 +777,22 @@ class LinearParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls, *args, begin=0, end=INF, by_epoch=True, epoch_length=None, **kwargs
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         begin = int(begin * epoch_length)
         if end != INF:
@@ -792,10 +808,15 @@ class LinearParamScheduler(_ParamScheduler):
             ]
 
         return [
-            group[self.param_name] *
-            (1. + (self.end_factor - self.start_factor) /
-             (self.total_iters * self.start_factor + (self.last_step - 1) *
-              (self.end_factor - self.start_factor)))
+            group[self.param_name]
+            * (
+                1.0
+                + (self.end_factor - self.start_factor)
+                / (
+                    self.total_iters * self.start_factor
+                    + (self.last_step - 1) * (self.end_factor - self.start_factor)
+                )
+            )
             for group in self.optimizer.param_groups
         ]
 
@@ -828,17 +849,18 @@ class PolyParamScheduler(_ParamScheduler):
             Defaults to False.
     """
 
-    def __init__(self,
-                 optimizer: Union[Optimizer, OptimWrapper],
-                 param_name: str,
-                 eta_min: float = 0,
-                 power: float = 1.0,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
-
+    def __init__(
+        self,
+        optimizer: Union[Optimizer, OptimWrapper],
+        param_name: str,
+        eta_min: float = 0,
+        power: float = 1.0,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         self.eta_min = eta_min
         self.power = power
         self.total_iters = end - begin - 1
@@ -850,23 +872,22 @@ class PolyParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls, *args, begin=0, end=INF, by_epoch=True, epoch_length=None, **kwargs
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         begin = int(begin * epoch_length)
         if end != INF:
@@ -876,13 +897,14 @@ class PolyParamScheduler(_ParamScheduler):
     def _get_value(self):
         """Compute value using chainable form of the scheduler."""
         if self.last_step == 0:
-            return [
-                group[self.param_name] for group in self.optimizer.param_groups
-            ]
+            return [group[self.param_name] for group in self.optimizer.param_groups]
 
-        return [(group[self.param_name] - self.eta_min) *
-                (1 - 1 / (self.total_iters - self.last_step + 1))**self.power +
-                self.eta_min for group in self.optimizer.param_groups]
+        return [
+            (group[self.param_name] - self.eta_min)
+            * (1 - 1 / (self.total_iters - self.last_step + 1)) ** self.power
+            + self.eta_min
+            for group in self.optimizer.param_groups
+        ]
 
 
 @PARAM_SCHEDULERS.register_module()
@@ -950,25 +972,28 @@ class OneCycleParamScheduler(_ParamScheduler):
         https://arxiv.org/abs/1708.07120
     """  # noqa E501
 
-    def __init__(self,
-                 optimizer: Union[Optimizer, OptimWrapper],
-                 param_name: str,
-                 eta_max: float = 0,
-                 total_steps: Optional[int] = None,
-                 pct_start: float = 0.3,
-                 anneal_strategy: str = 'cos',
-                 div_factor: float = 25.,
-                 final_div_factor: float = 1e4,
-                 three_phase: bool = False,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
-
-        assert param_name == 'lr', ('OneCycle only works for learning rate '
-                                    'updating, but got patam_name as '
-                                    f'{param_name}')
+    def __init__(
+        self,
+        optimizer: Union[Optimizer, OptimWrapper],
+        param_name: str,
+        eta_max: float = 0,
+        total_steps: Optional[int] = None,
+        pct_start: float = 0.3,
+        anneal_strategy: str = "cos",
+        div_factor: float = 25.0,
+        final_div_factor: float = 1e4,
+        three_phase: bool = False,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
+        assert param_name == "lr", (
+            "OneCycle only works for learning rate "
+            "updating, but got patam_name as "
+            f"{param_name}"
+        )
 
         self.eta_max = eta_max
         self.div_factor = div_factor
@@ -977,68 +1002,71 @@ class OneCycleParamScheduler(_ParamScheduler):
         # Validate total_steps
         if total_steps is not None:
             if total_steps <= 0 or not isinstance(total_steps, int):
-                raise ValueError('Expected positive integer total_steps, '
-                                 f'but got {total_steps}')
+                raise ValueError(
+                    "Expected positive integer total_steps, " f"but got {total_steps}"
+                )
             self.total_steps = total_steps
         else:
             self.total_steps = self.end - self.begin
 
         # Validate pct_start
         if pct_start < 0 or pct_start > 1 or not isinstance(pct_start, float):
-            raise ValueError('Expected float between 0 and 1 pct_start, '
-                             f'but got {pct_start}')
+            raise ValueError(
+                "Expected float between 0 and 1 pct_start, " f"but got {pct_start}"
+            )
 
         # Validate anneal_strategy
-        if anneal_strategy not in ['cos', 'linear']:
+        if anneal_strategy not in ["cos", "linear"]:
             raise ValueError(
                 'anneal_strategy must by one of "cos" or "linear", '
-                f'instead got {anneal_strategy}')
-        elif anneal_strategy == 'cos':
+                f"instead got {anneal_strategy}"
+            )
+        elif anneal_strategy == "cos":
             self.anneal_func = self._annealing_cos
-        elif anneal_strategy == 'linear':
+        elif anneal_strategy == "linear":
             self.anneal_func = self._annealing_linear
 
         if three_phase:
             self._schedule_phases = [
                 {
-                    'end_step': float(pct_start * self.total_steps) - 1,
-                    f'start_{param_name}': f'initial_{param_name}',
-                    f'end_{param_name}': f'max_{param_name}'
+                    "end_step": float(pct_start * self.total_steps) - 1,
+                    f"start_{param_name}": f"initial_{param_name}",
+                    f"end_{param_name}": f"max_{param_name}",
                 },
                 {
-                    'end_step': float(2 * pct_start * self.total_steps) - 2,
-                    f'start_{param_name}': f'max_{param_name}',
-                    f'end_{param_name}': f'initial_{param_name}'
+                    "end_step": float(2 * pct_start * self.total_steps) - 2,
+                    f"start_{param_name}": f"max_{param_name}",
+                    f"end_{param_name}": f"initial_{param_name}",
                 },
                 {
-                    'end_step': self.total_steps - 1,
-                    f'start_{param_name}': f'initial_{param_name}',
-                    f'end_{param_name}': f'min_{param_name}'
+                    "end_step": self.total_steps - 1,
+                    f"start_{param_name}": f"initial_{param_name}",
+                    f"end_{param_name}": f"min_{param_name}",
                 },
             ]
         else:
             self._schedule_phases = [
                 {
-                    'end_step': float(pct_start * self.total_steps) - 1,
-                    f'start_{param_name}': f'initial_{param_name}',
-                    f'end_{param_name}': f'max_{param_name}'
+                    "end_step": float(pct_start * self.total_steps) - 1,
+                    f"start_{param_name}": f"initial_{param_name}",
+                    f"end_{param_name}": f"max_{param_name}",
                 },
                 {
-                    'end_step': self.total_steps - 1,
-                    f'start_{param_name}': f'max_{param_name}',
-                    f'end_{param_name}': f'min_{param_name}'
+                    "end_step": self.total_steps - 1,
+                    f"start_{param_name}": f"max_{param_name}",
+                    f"end_{param_name}": f"min_{param_name}",
                 },
             ]
 
         # Initialize parameters
-        max_values = self._format_param(f'max_{param_name}', optimizer,
-                                        eta_max)
+        max_values = self._format_param(f"max_{param_name}", optimizer, eta_max)
         if last_step == -1:
             for idx, group in enumerate(optimizer.param_groups):
-                group[f'initial_{param_name}'] = max_values[idx] / div_factor
-                group[f'max_{param_name}'] = max_values[idx]
-                group[f'min_{param_name}'] = \
-                    group[f'initial_{param_name}'] / final_div_factor
+                group[f"initial_{param_name}"] = max_values[idx] / div_factor
+                group[f"max_{param_name}"] = max_values[idx]
+                group[f"min_{param_name}"] = (
+                    group[f"initial_{param_name}"] / final_div_factor
+                )
 
         super().__init__(
             optimizer=optimizer,
@@ -1047,15 +1075,17 @@ class OneCycleParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     def _format_param(self, name, optimizer, param):
         """Return correctly formatted lr/momentum for each param group."""
         if isinstance(param, (list, tuple)):
             if len(param) != len(optimizer.param_groups):
                 raise ValueError(
-                    f'expected {len(optimizer.param_groups)} values '
-                    f'for {name}, got {len(param)}')
+                    f"expected {len(optimizer.param_groups)} values "
+                    f"for {name}, got {len(param)}"
+                )
             return param
         else:
             return [param] * len(optimizer.param_groups)
@@ -1074,21 +1104,25 @@ class OneCycleParamScheduler(_ParamScheduler):
         return (end - start) * pct + start
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              begin=0,
-                              end=INF,
-                              total_steps=None,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls,
+        *args,
+        begin=0,
+        end=INF,
+        total_steps=None,
+        by_epoch=True,
+        epoch_length=None,
+        **kwargs,
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         by_epoch = False
         begin = int(begin * epoch_length)
         if end != INF:
@@ -1101,7 +1135,8 @@ class OneCycleParamScheduler(_ParamScheduler):
             end=end,
             total_steps=total_steps,
             by_epoch=by_epoch,
-            **kwargs)
+            **kwargs,
+        )
 
     def _get_value(self):
         """Compute value using chainable form of the scheduler."""
@@ -1111,20 +1146,23 @@ class OneCycleParamScheduler(_ParamScheduler):
 
         if step_num > self.total_steps:
             raise ValueError(
-                f'Tried to step {step_num + 1} times. '
-                f'The specified number of total steps is {self.total_steps}')
+                f"Tried to step {step_num + 1} times. "
+                f"The specified number of total steps is {self.total_steps}"
+            )
 
         for group in self.optimizer.param_groups:
             start_step = 0
             for i, phase in enumerate(self._schedule_phases):
-                end_step = phase['end_step']
+                end_step = phase["end_step"]
                 if step_num <= end_step or i == len(self._schedule_phases) - 1:
                     pct = (step_num - start_step) / (end_step - start_step)
                     computed_param = self.anneal_func(
-                        group[phase['start_' + self.param_name]],
-                        group[phase['end_' + self.param_name]], pct)
+                        group[phase["start_" + self.param_name]],
+                        group[phase["end_" + self.param_name]],
+                        pct,
+                    )
                     break
-                start_step = phase['end_step']
+                start_step = phase["end_step"]
 
             params.append(computed_param)
 
@@ -1133,58 +1171,47 @@ class OneCycleParamScheduler(_ParamScheduler):
 
 @PARAM_SCHEDULERS.register_module()
 class CosineRestartParamScheduler(_ParamScheduler):
-    """Sets the parameters of each parameter group according to the cosine
-    annealing with restarts scheme. The cosine restart policy anneals the
-    parameter from the initial value to `eta_min` with a cosine annealing
-    schedule and then restarts another period from the maximum value multiplied
-    with `restart_weight`.
+    """根据余弦退火重启方案设置每个参数组的参数。余弦重启策略通过余弦退火调度将参数从初始值退到`eta_min`，
+    然后以最大值乘以`restart_weight`重新开始另一个周期。
 
     Args:
-        optimizer (Optimizer or OptimWrapper): optimizer or Wrapped
-            optimizer.
-        param_name (str): Name of the parameter to be adjusted, such as
-            ``lr``, ``momentum``.
-        periods (list[int]): Periods for each cosine anneling cycle.
-        restart_weights (list[float]): Restart weights at each
-            restart iteration. Defaults to [1].
-        eta_min (float, optional): Minimum parameter value at the end of
-            scheduling. Defaults to None.
-        eta_min_ratio (float, optional): The ratio of minimum parameter value
-            to the base parameter value. Either `eta_min` or `eta_min_ratio`
-            should be specified. Defaults to None.
-        begin (int): Step at which to start updating the parameters.
-            Defaults to 0.
-        end (int): Step at which to stop updating the parameters.
-            Defaults to INF.
-        last_step (int): The index of last step. Used for resume without
-            state dict. Defaults to -1.
-        by_epoch (bool): Whether the scheduled parameters are updated by
-            epochs. Defaults to True.
-        verbose (bool): Whether to print the value for each update.
-            Defaults to False.
+        optimizer (Optimizer or OptimWrapper): 优化器或包装过的优化器
+        param_name (str): 要调整的参数名称，例如“lr”，“momentum”等
+        periods (list[int]): 每个余弦退火周期的长度列表.
+        restart_weights (list[float]): 每次重启迭代时使用的重启权重列表，默认为[1]。
+        eta_min (float, optional): 调度结束时的最小参数值，默认为None。
+        eta_min_ratio (float, optional): 最小参数值与基本参数值之间的比率。需要指定其中之一，即`eta_min`或者 `eta_min_ratio`。默认为None。
+        begin (int): 开始更新参数的步骤索引，默认为0。
+        end (int): 停止更新参数的步骤索引，默认为INF（无穷大）。
+        last_step (int): 最后一步索引。用于恢复训练而不使用状态字典。默认为 -1.
+        by_epoch (bool): 是否按照epoch来更新计划中的各个变量. 默认是True
+        verbose (bool): 是否打印每次更新时候对应数值. 默认是False.
     """
 
-    def __init__(self,
-                 optimizer: Union[Optimizer, OptimWrapper],
-                 param_name: str,
-                 periods: List[int],
-                 restart_weights: Sequence[float] = (1, ),
-                 eta_min: Optional[float] = None,
-                 eta_min_ratio: Optional[float] = None,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
-        assert (eta_min is None) ^ (eta_min_ratio is None)
+    def __init__(
+        self,
+        optimizer: Union[Optimizer, OptimWrapper],
+        param_name: str,
+        periods: List[int],
+        restart_weights: Sequence[float] = (1,),
+        eta_min: Optional[float] = None,
+        eta_min_ratio: Optional[float] = None,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
+        assert (eta_min is None) ^ (eta_min_ratio is None)  # 两者必须有一个为None
         self.periods = periods
         self.eta_min = eta_min
         self.eta_min_ratio = eta_min_ratio
         self.restart_weights = restart_weights
-        assert (len(self.periods) == len(self.restart_weights)
-                ), 'periods and restart_weights should have the same length.'
+        assert len(self.periods) == len(
+            self.restart_weights
+        ), "periods and restart_weights should have the same length."
         self.cumulative_periods = [
-            sum(self.periods[0:i + 1]) for i in range(0, len(self.periods))
+            sum(self.periods[0 : i + 1]) for i in range(0, len(self.periods))
         ]
 
         super().__init__(
@@ -1194,53 +1221,50 @@ class CosineRestartParamScheduler(_ParamScheduler):
             end=end,
             last_step=last_step,
             by_epoch=by_epoch,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
     @classmethod
-    def build_iter_from_epoch(cls,
-                              *args,
-                              periods,
-                              begin=0,
-                              end=INF,
-                              by_epoch=True,
-                              epoch_length=None,
-                              **kwargs):
+    def build_iter_from_epoch(
+        cls,
+        *args,
+        periods,
+        begin=0,
+        end=INF,
+        by_epoch=True,
+        epoch_length=None,
+        **kwargs,
+    ):
         """Build an iter-based instance of this scheduler from an epoch-based
         config."""
-        assert by_epoch, 'Only epoch-based kwargs whose `by_epoch=True` can ' \
-                         'be converted to iter-based.'
-        assert epoch_length is not None and epoch_length > 0, \
-            f'`epoch_length` must be a positive integer, ' \
-            f'but got {epoch_length}.'
+        assert by_epoch, (
+            "Only epoch-based kwargs whose `by_epoch=True` can "
+            "be converted to iter-based."
+        )
+        assert epoch_length is not None and epoch_length > 0, (
+            f"`epoch_length` must be a positive integer, " f"but got {epoch_length}."
+        )
         periods = [p * epoch_length for p in periods]
         by_epoch = False
         begin = int(begin * epoch_length)
         if end != INF:
             end = int(end * epoch_length)
         return cls(
-            *args,
-            periods=periods,
-            begin=begin,
-            end=end,
-            by_epoch=by_epoch,
-            **kwargs)
+            *args, periods=periods, begin=begin, end=end, by_epoch=by_epoch, **kwargs
+        )
 
     def _get_value(self):
         """Compute value using chainable form of the scheduler."""
-        idx = self.get_position_from_periods(self.last_step,
-                                             self.cumulative_periods)
+        idx = self.get_position_from_periods(self.last_step, self.cumulative_periods)
         # if current step is not in the periods, return origin parameters
         if idx is None:
-            return [
-                group[self.param_name] for group in self.optimizer.param_groups
-            ]
+            return [group[self.param_name] for group in self.optimizer.param_groups]
         current_weight = self.restart_weights[idx]
         nearest_restart = 0 if idx == 0 else self.cumulative_periods[idx - 1]
         current_periods = self.periods[idx]
         step = self.last_step - nearest_restart
         values = []
-        for base_value, group in zip(self.base_values,
-                                     self.optimizer.param_groups):
+        for base_value, group in zip(self.base_values, self.optimizer.param_groups):
             eta_max = base_value * current_weight
             if self.eta_min_ratio is None:
                 eta_min = self.eta_min
@@ -1250,15 +1274,18 @@ class CosineRestartParamScheduler(_ParamScheduler):
                 values.append(eta_max)
             else:
                 values.append(
-                    (1 + math.cos(math.pi * step / current_periods)) /
-                    (1 + math.cos(math.pi * (step - 1) / current_periods)) *
-                    (group[self.param_name] - eta_min) + eta_min)
+                    (1 + math.cos(math.pi * step / current_periods))
+                    / (1 + math.cos(math.pi * (step - 1) / current_periods))
+                    * (group[self.param_name] - eta_min)
+                    + eta_min
+                )
 
         return values
 
     @staticmethod
     def get_position_from_periods(
-            iteration: int, cumulative_periods: List[int]) -> Optional[int]:
+        iteration: int, cumulative_periods: List[int]
+    ) -> Optional[int]:
         """Get the position from a period list.
 
         It will return the index of the right-closest number in the period
@@ -1280,6 +1307,84 @@ class CosineRestartParamScheduler(_ParamScheduler):
             if iteration < period:
                 return i
         return None
+
+
+@PARAM_SCHEDULERS.register_module()
+class CosineLearningRateWithWarmRestartsParamScheduler(_ParamScheduler):
+    """Sets the learning rate of each parameter group according to the cosine
+    annealing with warm restarts scheme. The learning rate starts from the
+    `warmup_start_lr`, increases to the initial lr in `warmup_epochs`, and then
+    follows a cosine decay to `cosine_end_lr` over `epochs`.
+
+    Args:
+        optimizer (Optimizer or OptimWrapper): Wrapped optimizer.
+        param_name (str): Name of the parameter to be adjusted, usually 'lr'.
+        warmup_epochs (int): Number of epochs for warmup.
+        epochs (int): Total number of epochs for the schedule.
+        cosine_end_lr (float): Minimum learning rate at the end of scheduling.
+        warmup_start_lr (float): Starting learning rate for warmup.
+        last_epoch (int): The index of last epoch. Defaults to -1.
+        verbose (bool): If `True`, prints a message to stdout for
+            each update. Defaults to `False`.
+    """
+
+    def __init__(
+        self,
+        optimizer: Union[Optimizer, OptimWrapper],
+        param_name: str,
+        warmup_epochs: int,
+        epochs: int,
+        cosine_end_lr: float = 1e-6,
+        warmup_start_lr: float = 1e-8,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
+        self.warmup_epochs = warmup_epochs
+        self.epochs = epochs
+        self.cosine_end_lr = cosine_end_lr
+        self.warmup_start_lr = warmup_start_lr
+
+        # Set eta_min to cosine_end_lr as per original implementation
+        super().__init__(
+            optimizer,
+            param_name=param_name,
+            begin=begin,
+            end=end,
+            last_step=last_step,
+            by_epoch=by_epoch,
+            verbose=verbose,
+        )
+
+    def _get_value(self):
+        """Compute the learning rate using the original scheduler's logic."""
+        if self.last_step < self.warmup_epochs:
+            # Warmup phase: linearly scale up
+            lr = (
+                self.last_step
+                * (self.base_values[0] - self.warmup_start_lr)
+                / self.warmup_epochs
+            ) + self.warmup_start_lr
+        else:
+            # Cosine annealing phase
+            lr = (
+                self.cosine_end_lr
+                + (self.base_values[0] - self.cosine_end_lr)
+                * (
+                    math.cos(
+                        math.pi
+                        * (self.last_step - self.warmup_epochs)
+                        / (self.epochs - self.warmup_epochs)
+                    )
+                    + 1
+                )
+                / 2
+            )
+
+        # Apply computed lr to all param groups
+        return [lr for _ in self.optimizer.param_groups]
 
 
 @PARAM_SCHEDULERS.register_module()
@@ -1347,39 +1452,43 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
 
     need_val_args = True
 
-    def __init__(self,
-                 optimizer: OptimizerType,
-                 param_name: str,
-                 monitor: str = 'loss',
-                 rule: str = 'less',
-                 factor: float = 0.1,
-                 patience: int = 10,
-                 threshold: float = 1e-4,
-                 threshold_rule: str = 'rel',
-                 cooldown: int = 0,
-                 min_value: Union[float, Sequence[float]] = 0.,
-                 eps: float = 1e-8,
-                 begin: int = 0,
-                 end: int = INF,
-                 last_step: int = -1,
-                 by_epoch: bool = True,
-                 verbose: bool = False):
-
+    def __init__(
+        self,
+        optimizer: OptimizerType,
+        param_name: str,
+        monitor: str = "loss",
+        rule: str = "less",
+        factor: float = 0.1,
+        patience: int = 10,
+        threshold: float = 1e-4,
+        threshold_rule: str = "rel",
+        cooldown: int = 0,
+        min_value: Union[float, Sequence[float]] = 0.0,
+        eps: float = 1e-8,
+        begin: int = 0,
+        end: int = INF,
+        last_step: int = -1,
+        by_epoch: bool = True,
+        verbose: bool = False,
+    ):
         # Attach optimizer
         if not isinstance(optimizer, (Optimizer, OptimWrapper)):
-            raise TypeError('``optimizer`` should be an Optimizer,'
-                            'but got {}'.format(type(optimizer).__name__))
+            raise TypeError(
+                "``optimizer`` should be an Optimizer,"
+                "but got {}".format(type(optimizer).__name__)
+            )
         self.optimizer = optimizer
         self.param_name = param_name
 
         if end <= begin:
-            raise ValueError('end should be larger than begin, but got'
-                             ' begin={}, end={}'.format(begin, end))
+            raise ValueError(
+                "end should be larger than begin, but got"
+                " begin={}, end={}".format(begin, end)
+            )
         self.begin = begin
         self.end = end
 
-        assert by_epoch, \
-            f'Now {type(self).__name__} only support by_epoch=True'
+        assert by_epoch, f"Now {type(self).__name__} only support by_epoch=True"
         self.by_epoch = by_epoch
 
         assert isinstance(last_step, int) and last_step >= -1
@@ -1388,14 +1497,14 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
             for group in optimizer.param_groups:
                 # If the param is never be scheduled, record the current value
                 # as the initial value.
-                group.setdefault(f'initial_{param_name}', group[param_name])
+                group.setdefault(f"initial_{param_name}", group[param_name])
         else:
             for i, group in enumerate(optimizer.param_groups):
-                if f'initial_{param_name}' not in group:
+                if f"initial_{param_name}" not in group:
                     raise KeyError(
                         f"param 'initial_{param_name}' is not specified "
-                        'in param_groups[{}] when resuming an optimizer'.
-                        format(i))
+                        "in param_groups[{}] when resuming an optimizer".format(i)
+                    )
 
         self.last_step = last_step
 
@@ -1403,7 +1512,7 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
         self.verbose = verbose
 
         if factor >= 1.0:
-            raise ValueError('Factor should be < 1.0.')
+            raise ValueError("Factor should be < 1.0.")
         self.factor = factor
 
         # This code snippet handles compatibility with the optimizer wrapper.
@@ -1418,19 +1527,23 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
 
         if isinstance(min_value, (list, tuple)):
             if len(min_value) != len(raw_optimizer.param_groups):
-                raise ValueError('expected {} min_lrs, got {}'.format(
-                    len(raw_optimizer.param_groups), len(min_value)))
+                raise ValueError(
+                    "expected {} min_lrs, got {}".format(
+                        len(raw_optimizer.param_groups), len(min_value)
+                    )
+                )
             self.min_values = list(min_value)
             # Consider the `min_value` of the last param_groups
             # as the base setting. And we only add this value when
             # the optimizer is OptimWrapper.
-            if isinstance(optimizer, OptimWrapper) and \
-                    optimizer.base_param_settings is not None:
+            if (
+                isinstance(optimizer, OptimWrapper)
+                and optimizer.base_param_settings is not None
+            ):
                 self.min_values.append(self.min_values[-1])
 
         else:
-            self.min_values = [min_value] * len(
-                optimizer.param_groups)
+            self.min_values = [min_value] * len(optimizer.param_groups)
 
         self.patience = patience
         self.cooldown = cooldown
@@ -1442,7 +1555,8 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
 
         self.monitor = monitor
         self._init_is_better(
-            rule=rule, threshold=threshold, threshold_rule=threshold_rule)
+            rule=rule, threshold=threshold, threshold_rule=threshold_rule
+        )
         self._reset()
 
         # remove call self.step() and init self._global_step = 0
@@ -1466,8 +1580,9 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
             return
 
         if not isinstance(metrics, dict):
-            raise TypeError('metrics type should be dict,'
-                            f' but got type {type(metrics)}')
+            raise TypeError(
+                "metrics type should be dict," f" but got type {type(metrics)}"
+            )
 
         # Compute parameter value per param group in the effective range
         if self.begin <= self._global_step < self.end:
@@ -1489,8 +1604,7 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
                 if self.num_bad_epochs > self.patience:
                     values = self._get_value()
 
-                    for i, data in enumerate(
-                            zip(self.optimizer.param_groups, values)):
+                    for i, data in enumerate(zip(self.optimizer.param_groups, values)):
                         param_group, value = data
                         if param_group[self.param_name] - value > self.eps:
                             param_group[self.param_name] = value
@@ -1499,8 +1613,10 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
                     self.num_bad_epochs = 0
 
             else:
-                raise KeyError(f'Excepted key in {list(metrics.keys())},'
-                               f' but got key {self.monitor} is not in dict')
+                raise KeyError(
+                    f"Excepted key in {list(metrics.keys())},"
+                    f" but got key {self.monitor} is not in dict"
+                )
 
         self._last_value = [
             group[self.param_name] for group in self.optimizer.param_groups
@@ -1515,11 +1631,12 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
             value (float): The parameter value.
         """
         if is_verbose:
-            step_name = 'epoch' if self.by_epoch else 'iter'
+            step_name = "epoch" if self.by_epoch else "iter"
             print_log(
-                f'Adjusting parameter value of group {group} to {value:.4e} '
-                f'in {step_name} {self.last_step}.',
-                logger='current')
+                f"Adjusting parameter value of group {group} to {value:.4e} "
+                f"in {step_name} {self.last_step}.",
+                logger="current",
+            )
 
     def _get_value(self):
         """Compute value using chainable form of the scheduler."""
@@ -1535,15 +1652,15 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
 
     def _is_better(self, a, best):
         """Judge whether the monitor value is better."""
-        if self.rule == 'less' and self.threshold_rule == 'rel':
-            rel_epsilon = 1. - self.threshold
+        if self.rule == "less" and self.threshold_rule == "rel":
+            rel_epsilon = 1.0 - self.threshold
             return a < best * rel_epsilon
 
-        elif self.rule == 'less' and self.threshold_rule == 'abs':
+        elif self.rule == "less" and self.threshold_rule == "abs":
             return a < best - self.threshold
 
-        elif self.rule == 'greater' and self.threshold_rule == 'rel':
-            rel_epsilon = self.threshold + 1.
+        elif self.rule == "greater" and self.threshold_rule == "rel":
+            rel_epsilon = self.threshold + 1.0
             return a > best * rel_epsilon
 
         else:  # rule == 'greater' and epsilon_mode == 'abs':
@@ -1552,14 +1669,13 @@ class ReduceOnPlateauParamScheduler(_ParamScheduler):
     def _init_is_better(self, rule, threshold, threshold_rule):
         """Initialize rule and its associated values."""
         if threshold < 0:
-            raise ValueError(f'threshold {threshold} should be >= 0.')
-        if rule not in {'less', 'greater'}:
-            raise ValueError(f'mode {rule} is unknown!')
-        if threshold_rule not in {'rel', 'abs'}:
-            raise ValueError(f'threshold mode {threshold_rule}'
-                             ' is unknown!')
+            raise ValueError(f"threshold {threshold} should be >= 0.")
+        if rule not in {"less", "greater"}:
+            raise ValueError(f"mode {rule} is unknown!")
+        if threshold_rule not in {"rel", "abs"}:
+            raise ValueError(f"threshold mode {threshold_rule}" " is unknown!")
 
-        if rule == 'less':
+        if rule == "less":
             self.rule_worse = INF
         else:  # rule == 'greater':
             self.rule_worse = -INF

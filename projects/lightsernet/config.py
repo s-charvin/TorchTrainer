@@ -1,171 +1,200 @@
-import _init_paths
-
-import argparse
-
-import torch
-from torch.optim import SGD
-import torch.nn.functional as F
-import torchvision
+by_epoch = True
+work_dir = "./work_dir/lightsernet"
+experiment_name = "lightsernet"
+model = dict(type="LightSerNet")
 
 
-from TorchTrainer.utils.registry import DATASETS
-from TorchTrainer.model import BaseModel
-from TorchTrainer.runner import Runner
-from TorchTrainer.evaluator import BaseMetric
-from TorchTrainer.structures import label_data, ClsDataSample
+data_preprocessor = None
 
-from model import LightSerNet
+dataset_transforms = [
+    dict(
+        type="LoadAudioFromFile",
+        backend="librosa",
+        backend_args=None,
+        to_float32=True,
+    ),
+    dict(
+        type="ResampleAudio",
+        sample_rate=16000,
+        keys=["audio_data"],
+    ),
+    dict(
+        type="TimeRandomSplit",
+        win_length=16000 * 7,
+        keys=["audio_data"],
+    ),
+    dict(
+        type="PadCutAudio",
+        sample_num=16000 * 7,
+        pad_mode="random",
+        keys=["audio_data"],
+    ),
+    dict(
+        type="MFCC",
+        keys=["audio_data"],
+        override=False,
+        backend="librosa",
+        n_mfcc=40,
+        dct_type=2,
+        n_fft=1024,
+        win_length=1024,
+        hop_length=256,
+        window="hann",
+        center=True,
+        pad_mode="reflect",
+        power=2.0,
+        n_mels=128,
+        fmin=80.0,
+        fmax=7600.0,
+        norm="slaney",
+        # torchaudio parameters
+        lifter=0,
+        log_mels=True,
+        pad=0,
+        # librosa parameters
+        normalized=True,
+        onesided=True,
+    ),
+    dict(type="PackAudioClsInputs", keys=["mfcc_data"]),
+]
 
+dataset = dict(
+    type="IEMOCAP4C",
+    root="/sdb/visitors2/SCW/data/IEMOCAP",
+    enable_video=False,
+    threads=0,
+    serialize=False,
+)
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Distributed Training")
-    parser.add_argument(
-        "--launcher",
-        choices=["none", "pytorch", "slurm", "mpi"],
-        default="none",
-        help="job launcher",
-    )
-    parser.add_argument("--local_rank", type=int, default=0)
+train_dataset = dict(
+    type="IEMOCAP4C",
+    root="/home/visitors2/SCW/TorchTrainer/work_dir/lightsernet/train/data.pkl",
+    enable_video=False,
+    threads=0,
+    transforms=dataset_transforms,
+)
 
-    args = parser.parse_args()
-    return args
+val_dataset = dict(
+    type="IEMOCAP4C",
+    root="/home/visitors2/SCW/TorchTrainer/work_dir/lightsernet/val/data.pkl",
+    enable_video=False,
+    threads=0,
+    transforms=dataset_transforms,
+)
 
-
-def main():
-    args = parse_args()
-    dataset = dict(
-        type="IEMOCAP4C",
-        root="/sdb/visitors2/SCW/data/IEMOCAP",
-        enable_video=False,
-        threads=0,
-        filter=dict(
-            replace=dict(
-                label=("excited", "happy"),
-            ),
-            drop=dict(
-                label=[
-                    "other",
-                    "xxx",
-                    "frustrated",
-                    "disgusted",
-                    "fearful",
-                    "surprised",
-                ],
-            ),
-        ),
-        transforms=[
-            dict(
-                type="LoadAudioFromFile",
-                backend="librosa",
-                backend_args=None,
-                to_float32=True,
-            ),
-            dict(
-                type="ResampleAudio",
-                sample_rate=16000,
-                keys=["audio_data"],
-            ),
-            dict(
-                type="TimeRandomSplit",
-                win_length=16000,
-                keys=["audio_data"],
-            ),
-            dict(
-                type="PadCutAudio",
-                sample_num=16000,
-                pad_mode="random",
-                keys=["audio_data"],
-            ),
-            dict(
-                type="MFCC",
-                keys=["audio_data"],
-                override=False,
-                backend="librosa",
-                n_mfcc=40,
-                dct_type=2,
-                n_fft=1024,
-                win_length=1024,
-                hop_length=256,
-                window="hann",
-                center=True,
-                pad_mode="reflect",
-                power=2.0,
-                n_mels=128,
-                fmin=80.0,
-                fmax=7600.0,
-                norm="slaney",
-                # torchaudio parameters
-                lifter=0,
-                log_mels=True,
-                pad=0,
-                # librosa parameters
-                normalized=True,
-                onesided=True,
-            ),
-            dict(type="PackAudioClsInputs", keys=["mfcc_data"]),
-        ],
-    )
-
-    model = LightSerNet()
-    dataloader = dict(
-        batch_size=32,
-        num_workers=0,
-        sampler=dict(type="DefaultSampler", shuffle=True),
-        dataset=dataset,
-    )
-    evaluator = dict(type="Accuracy")
-
-    optim_wrapper = dict(
-        type="OptimWrapper",
-        optimizer=dict(
-            type="AdamW",
-            lr=0.0001,
-            betas=(0.9, 0.999),
-            weight_decay=0.1,
-        ),
-    )
-
-    train_cfg = dict(
-        type="IterBasedTrainLoop",
-        max_iters=10000,
-        val_interval=100,
-    )
-    # dict(by_epoch=True, max_epochs=2, val_interval=1)
-
-    default_hooks = dict(
-        logger=dict(type="LoggerHook", interval=50),
-        checkpoint=dict(
-            type="CheckpointHook",
-            by_epoch=False,
-            save_last=True,
-            interval=50,
-            max_keep_ckpts=5,
-        ),
-    )
-
-    vis_backends = [dict(type="LocalVisBackend"), dict(type="TensorboardVisBackend")]
-    visualizer = dict(
-        type="DetLocalVisualizer", vis_backends=vis_backends, name="visualizer"
-    )
-    log_processor = dict(type="LogProcessor", window_size=50, by_epoch=False)
-    auto_scale_lr = dict(base_batch_size=64)
-    runner = Runner(
-        model=model,
-        work_dir="./work_dir",
-        train_dataloader=dataloader,
-        optim_wrapper=optim_wrapper,
-        train_cfg=train_cfg,
-        val_dataloader=dataloader,
-        val_cfg=dict(),
-        val_evaluator=[
-            dict(type="Accuracy"),
-            dict(type="ConfusionMatrix"),
-            dict(type="SingleLabelMetric"),
-        ],
-        launcher=args.launcher,
-    )
-    runner.train()
+train_dataloader = dict(
+    batch_size=64,
+    num_workers=0,
+    sampler=dict(type="DefaultSampler", shuffle=True),
+    dataset=train_dataset,
+)
+train_cfg = dict(
+    type="EpochBasedTrainLoop",
+    max_epochs=200,
+    val_begin=1,
+    val_interval=1,
+)
+auto_scale_lr = None
 
 
-if __name__ == "__main__":
-    main()
+optim_wrapper = dict(
+    type="OptimWrapper",
+    optimizer=dict(
+        type="AdamW",
+        lr=0.001,
+        betas=(0.9, 0.999),
+    ),
+)
+# 200 个 epoch, 学习率从 0.001 降到 1e-7，=, 每 50 个 epoch 降低 0.00025 / 200 = 1.25e-6
+param_scheduler = [
+    dict(
+        type="CosineRestartParamScheduler",
+        param_name="lr",
+        periods=[50, 100, 150, 200],
+        restart_weights=[1, 0.5, 0.25, 0.125],
+        eta_min=1e-7,
+        last_step=-1,
+        by_epoch=by_epoch,
+    ),
+]
+
+# param_scheduler = [
+#     dict(
+#         type="CosineLearningRateWithWarmRestartsParamScheduler",
+#         param_name="lr",
+#         warmup_epochs=40,
+#         cosine_end_lr=1e-6,
+#         warmup_start_lr=1e-8,
+#         epochs=200,
+#         last_step=-1,
+#         by_epoch=by_epoch,
+#     ),
+# ]
+
+
+val_dataloader = dict(
+    batch_size=64,
+    num_workers=0,
+    sampler=dict(type="DefaultSampler", shuffle=False),
+    dataset=val_dataset,
+)
+
+val_cfg = dict(
+    type="ValLoop",
+)
+
+
+val_evaluator = [
+    dict(type="Accuracy"),
+    dict(type="ConfusionMatrix"),
+    dict(type="SingleLabelMetric"),
+]
+
+test_dataloader = dict(
+    batch_size=32,
+    num_workers=0,
+    sampler=dict(type="DefaultSampler", shuffle=False),
+    dataset=val_dataset,
+)
+
+test_cfg = dict(
+    type="TestLoop",
+)
+
+test_evaluator = [
+    dict(type="Accuracy"),
+    dict(type="ConfusionMatrix"),
+    dict(type="SingleLabelMetric"),
+]
+
+
+custom_hooks = dict(
+    runtime_info=dict(type="RuntimeInfoHook"),
+    timer=dict(type="IterTimerHook"),
+    sampler_seed=dict(type="DistSamplerSeedHook"),
+    logger=dict(type="LoggerHook"),
+    param_scheduler=dict(type="ParamSchedulerHook"),
+    checkpoint=dict(type="CheckpointHook", interval=1),
+)
+
+resume = False
+load_from = None
+
+launcher = "none"
+env_cfg = dict(
+    cudnn_benchmark=True,
+    mp_cfg=dict(
+        mp_start_method="fork",
+        opencv_num_threads=0,
+    ),
+    dist_cfg=dict(backend="nccl"),
+)
+
+log_processor = dict(type="LogProcessor", window_size=50, by_epoch=by_epoch)
+log_level = "INFO"
+visualizer = dict(
+    type="Visualizer",
+    vis_backends=[dict(type="LocalVisBackend"), dict(type="TensorboardVisBackend")],
+)
+
+randomness = dict(seed=None)

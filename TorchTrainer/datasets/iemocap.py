@@ -330,20 +330,21 @@ class IEMOCAP(BaseDataset):
                         except:  # 出错就跳过
                             continue
         self.metainfo = {}
-        self.data_list = {}
+        self.data_list = []
         self.metainfo["labels"] = tuple(sorted(list((set(_labels)))))
         self.metainfo["genders"] = tuple(["Female", "Male"])
 
         for i in range(len(self._audios)):
             filename_ = self._audios[i].split("_")
+
             self.data_list.append(
                 dict(
                     audio_path=os.path.join(
                         self.root,
-                        f"Session{sess}/sentences/wav/"
+                        f"Session{filename_[0][4]}/sentences/wav/"
                         + "_".join(filename_[:-1])
                         + "/"
-                        + filename
+                        + self._audios[i]
                         + ".wav",
                     ),
                     video_path=os.path.join(
@@ -374,7 +375,7 @@ class IEMOCAP(BaseDataset):
                     num_classes=len(self.metainfo["labels"]),
                 )
             )
-            return self.data_list, self.metainfo
+        return self.data_list, self.metainfo
 
     def check_video_file(self):
         print("检测视频文件夹是否存在...")
@@ -556,7 +557,8 @@ class IEMOCAP4C(IEMOCAP):
     def __init__(self, *arg, **args):
         is_serialize = args.pop("serialize", True)
         args["serialize"] = False
-        args.pop("filter")
+        if args.get("filter"):
+            args.pop("filter")
         args["filter"] = dict(
             replace=dict(
                 label=("excited", "happy"),
@@ -587,7 +589,8 @@ class IEMOCAP7C(IEMOCAP):
     def __init__(self, *arg, **args):
         is_serialize = args.pop("serialize", True)
         args["serialize"] = False
-        args.pop("filter")
+        if args.get("filter"):
+            args.pop("filter")
         args["filter"] = dict(
             drop=dict(
                 label=[
@@ -625,7 +628,8 @@ class IEMOCAP6C(IEMOCAP):
     def __init__(self, *arg, **args):
         is_serialize = args.pop("serialize", True)
         args["serialize"] = False
-        args.pop("filter")
+        if args.get("filter"):
+            args.pop("filter")
         args["filter"] = dict(
             drop=dict(
                 label=[
