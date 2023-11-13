@@ -206,3 +206,84 @@ class PackAudioClsInputs(BaseTransform):
         repr_str += f"(keys={self.keys})"
         repr_str += f"(prefix={self.prefix})"
         return repr_str
+
+
+class PackVideoClsInputs(BaseTransform):
+    """为视频分类模型打包输入数据.
+    需要提供的数据:
+    inputs:
+        - *_video_data: np.ndarray
+    meta:
+        - video_path: str
+        - fps: int
+        - label_id: int
+        - num_classes: int
+    """
+
+    def __init__(
+        self,
+        keys: Union[str, Sequence[str]] = None,
+        prefix: str = "video_data",
+    ) -> None:
+        if keys is not None:
+            self.keys = keys if isinstance(keys, Sequence) else [keys]
+        else:
+            self.keys = None
+        self.prefix = prefix
+        self.meta_keys = (
+            "index",
+            "video_path",
+            "fps",
+            "num_classes",
+        )
+
+    @staticmethod
+    def format_input(input_):
+        """用来将输入数据转换为 torch.Tensor 类型."""
+        if isinstance(input_, np.ndarray):
+            if input_.ndim == 3:
+                input_ = np.expand_dims(input_, 0)  # (H, W) -> (1, H, W)
+            if input_.ndim == 4 and not input_.flags.c_contiguous:
+                input_ = np.ascontiguousarray(input_)  # (T, H, W)
+                input_ = to_tensor(input_)
+            elif input_.ndim == 4:
+                input_ = to_tensor(input_).contiguous()
+            else:
+                input_ = to_tensor(input_)
+        elif not isinstance(input_, torch.Tensor):
+            raise TypeError(f"Unsupported input type {type(input_)}.")
+        return input_
+
+    def transform(self, results: dict) -> dict:
+        if self.keys is None:
+            self.keys = [key for key in results.keys() if (self.prefix in key)]
+
+        assert len(self.keys) > 0, "No video data found."
+        assert "label_id" in results, "label_id must be provided."
+
+        packed_results = dict()
+        packed_results["inputs"] = dict()
+
+        for key in self.keys:
+            packed_results["inputs"][key] = self.format_input(results.pop(key))
+        data_sample = ClsDataSample()
+
+        # Set default keys
+        if "label_id" in results:
+            data_sample.set_gt_label(results["label_id"])
+            if "label_score" in results:
+                data_sample.set_gt_score(results["label_score"])
+            else:
+                assert "num_classes" in results, "num_classes must be provided."
+                data_sample.set_gt_score(
+                    LabelData.label_to_onehot(
+                        data_sample.gt_label.label, num_classes=results["num_classes"]
+                    )
+                )
+
+        for key in self.meta_keys:
+            if key in results:
+                data_sample.set_field(key, results[key], field_type="metainfo")
+
+        packed_results["data_samples"] = data_sample
+        return packed_results

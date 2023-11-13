@@ -337,7 +337,7 @@ class IEMOCAP(BaseDataset):
         for i in range(len(self._audios)):
             filename_ = self._audios[i].split("_")
 
-            self.data_list.append( 
+            self.data_list.append(
                 dict(
                     audio_path=os.path.join(
                         self.root,
@@ -557,7 +557,8 @@ class IEMOCAP4C(IEMOCAP):
     def __init__(self, *arg, **args):
         is_serialize = args.pop("serialize", True)
         args["serialize"] = False
-        args.pop("filter")
+        if args.get("filter"):
+            args.pop("filter")
         args["filter"] = dict(
             replace=dict(
                 label=("excited", "happy"),
@@ -588,7 +589,8 @@ class IEMOCAP7C(IEMOCAP):
     def __init__(self, *arg, **args):
         is_serialize = args.pop("serialize", True)
         args["serialize"] = False
-        args.pop("filter")
+        if args.get("filter"):
+            args.pop("filter")
         args["filter"] = dict(
             drop=dict(
                 label=[
@@ -626,7 +628,8 @@ class IEMOCAP6C(IEMOCAP):
     def __init__(self, *arg, **args):
         is_serialize = args.pop("serialize", True)
         args["serialize"] = False
-        args.pop("filter")
+        if args.get("filter"):
+            args.pop("filter")
         args["filter"] = dict(
             drop=dict(
                 label=[

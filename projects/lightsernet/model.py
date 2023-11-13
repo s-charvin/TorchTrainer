@@ -1,14 +1,14 @@
 import torch
 from torch import Tensor, nn
 import torch.nn.functional as F
-from TorchTrainer.utils.registry import DATASETS
+from TorchTrainer.utils.registry import DATASETS, MODELS
 from TorchTrainer.model import BaseModel
 from TorchTrainer.structures import ClsDataSample
 
+from . import components
 
-import components
 
-
+@MODELS.register_module()
 class LightSerNet(BaseModel):
     """
     paper: Light-SERNet: A lightweight fully convolutional neural network for speech emotion recognition

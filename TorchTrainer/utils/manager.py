@@ -9,25 +9,25 @@ T = TypeVar("T")
 
 
 def _accquire_lock() -> None:
-    """获取锁, 以序列化对共享数据的访问. 在使用完毕后, 请通过_release_lock()释放该锁. """
+    """获取锁, 以序列化对共享数据的访问. 在使用完毕后, 请通过_release_lock()释放该锁."""
     if _lock:
         _lock.acquire()
 
 
 def _release_lock() -> None:
-    """释放通过调用_acquire_lock()获取的模块级锁. """
+    """释放通过调用_acquire_lock()获取的模块级锁."""
     if _lock:
         _lock.release()
 
 
 class ManagerMeta(type):
-    """通过元类, 使得全局类在创建实例之前先创建 _instance_dict 成员;
-    """
+    """通过元类, 使得全局类在创建实例之前先创建 _instance_dict 成员;"""
+
     def __init__(cls, *args):
         cls._instance_dict = OrderedDict()
         params = inspect.getfullargspec(cls)
         params_names = params[0] if params[0] else []
-        assert 'name' in params_names, f'{cls} must have the `name` argument'
+        assert "name" in params_names, f"{cls} must have the `name` argument"
         super().__init__(*args)
 
 

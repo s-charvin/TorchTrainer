@@ -1,3 +1,16 @@
+import os.path as osp
+import sys
+
+
+def add_path(path):
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+
+this_dir = osp.dirname(__file__)
+lib_path = osp.join(this_dir, "../..")
+add_path(lib_path)
+
 import argparse
 
 import torch
@@ -5,59 +18,14 @@ from torch.optim import SGD
 import torch.nn.functional as F
 import torchvision
 
-from TorchTrainer.utils.registry import DATASETS, MODELS
+
+from TorchTrainer.utils.registry import DATASETS
 from TorchTrainer.model import BaseModel
 from TorchTrainer.runner import Runner
 from TorchTrainer.evaluator import BaseMetric
 from TorchTrainer.structures import label_data, ClsDataSample
 
-
-@MODELS.register_module()
-class ResNet50(BaseModel):
-    def __init__(self):
-        super().__init__()
-        self.resnet = torchvision.models.resnet50(num_classes=7)
-        average_weight = torch.mean(self.resnet.conv1.weight, dim=1, keepdim=True)
-        self.resnet.conv1 = torch.nn.Conv2d(
-            1,
-            self.resnet.conv1.out_channels,
-            kernel_size=self.resnet.conv1.kernel_size,
-            stride=self.resnet.conv1.stride,
-            padding=self.resnet.conv1.padding,
-            bias=self.resnet.conv1.bias,
-        )
-        self.resnet.conv1.weight.data = average_weight
-
-    def forward(self, inputs, data_samples, mode):
-        data_sample = data_samples[0]
-        assert (
-            "gt_label" in data_sample
-            and getattr(data_sample.gt_label, "label", None) is not None
-        ), "gt_label must be provided"
-
-        targets = torch.stack([i.gt_label.label for i in data_samples]).squeeze(1)
-        mfcc = inputs["mfcc_data"]
-
-        if mfcc.dim() == 3:
-            mfcc = mfcc.unsqueeze(1)
-        cls_score = self.resnet(mfcc)
-
-        if mode == "loss":
-            return {"loss": F.cross_entropy(cls_score, targets)}
-        elif mode == "predict":
-            pred_scores = F.softmax(cls_score, dim=1)
-            pred_labels = pred_scores.argmax(dim=1, keepdim=True).detach()
-            out_data_samples = []
-            if data_samples is None:
-                data_samples = [None for _ in range(pred_scores.size(0))]
-            for data_sample, score, label in zip(
-                data_samples, pred_scores, pred_labels
-            ):
-                if data_sample is None:
-                    data_sample = ClsDataSample()
-                data_sample.set_pred_score(score).set_pred_label(label)
-                out_data_samples.append(data_sample)
-            return out_data_samples
+from model import MER_SISF_Conv2D_SVC_InterFusion_Joint_Attention
 
 
 def parse_args():
@@ -77,13 +45,24 @@ def parse_args():
 def main():
     args = parse_args()
     dataset = dict(
-        type="EMODB",
-        # root="/sdb/visitors2/SCW/data/EMODB",
-        root="E:/mypack/AppPackage/DeepLearning/torchTraining/data/EMODB",
+        type="IEMOCAP4C",
+        root="/sdb/visitors2/SCW/data/IEMOCAP",
+        enable_video=True,
+        threads=0,
         filter=dict(
-            # replace=dict(label=("bored", "sad")),
-            # dropna=["fearful"],
-            # query="gender == 1",
+            replace=dict(
+                label=("excited", "happy"),
+            ),
+            drop=dict(
+                label=[
+                    "other",
+                    "xxx",
+                    "frustrated",
+                    "disgusted",
+                    "fearful",
+                    "surprised",
+                ],
+            ),
         ),
         transforms=[
             dict(
@@ -93,9 +72,21 @@ def main():
                 to_float32=True,
             ),
             dict(
+                type="LoadVideoFromFile",
+                backend="pyav",
+                backend_args=None,
+                to_float32=True,
+            ),
+            dict(
                 type="ResampleAudio",
                 sample_rate=16000,
                 keys=["audio_data"],
+            ),
+            dict(
+                type="ResampleVideo",
+                in_fps=30,
+                out_fps=10,
+                keys=["video_data"],
             ),
             dict(
                 type="TimeRandomSplit",
@@ -103,10 +94,9 @@ def main():
                 keys=["audio_data"],
             ),
             dict(
-                type="PadCutAudio",
-                sample_num=16000,
-                pad_mode="random",
-                keys=["audio_data"],
+                type="TimeRandomSplit",
+                win_length=10,
+                keys=["video_data"],
             ),
             dict(
                 type="MFCC",
@@ -134,36 +124,23 @@ def main():
                 normalized=True,
                 onesided=True,
             ),
-            dict(
-                type="MelSpectrogram",
-                keys=["audio_data"],
-                override=False,
-                backend="librosa",
-                n_fft=1024,
-                win_length=1024,
-                hop_length=256,
-                f_min=80.0,
-                f_max=7600.0,
-                pad=0,
-                n_mels=128,
-                power=2.0,
-                normalized=True,
-                center=True,
-                pad_mode="reflect",
-                onesided=True,
-            ),
             dict(type="PackAudioClsInputs", keys=["mfcc_data"]),
+            dict(type="PackVideoClsInputs", keys=["video_data"]),
         ],
     )
 
-    model = ResNet50()
+    model = MER_SISF_Conv2D_SVC_InterFusion_Joint_Attention(
+        num_classes=4,
+        seq_len=[189, 30],
+        last_hidden_dim=[320, 320],
+        input_size=[[189, 40], [150, 150]],
+    )
     dataloader = dict(
         batch_size=32,
-        num_workers=0,
+        num_workers=8,
         sampler=dict(type="DefaultSampler", shuffle=True),
         dataset=dataset,
     )
-    evaluator = dict(type="Accuracy")
 
     optim_wrapper = dict(
         type="OptimWrapper",
@@ -175,15 +152,10 @@ def main():
         ),
     )
 
-    # train_cfg = dict(
-    #     type="IterBasedTrainLoop",
-    #     max_iters=10000,
-    #     val_interval=100,
-    # )
     train_cfg = dict(
-        type="EpochBasedTrainLoop",
-        max_epochs=200,
-        val_interval=1,
+        type="IterBasedTrainLoop",
+        max_iters=10000,
+        val_interval=100,
     )
     # dict(by_epoch=True, max_epochs=2, val_interval=1)
 
@@ -204,7 +176,6 @@ def main():
     )
     log_processor = dict(type="LogProcessor", window_size=50, by_epoch=False)
     auto_scale_lr = dict(base_batch_size=64)
-
     runner = Runner(
         model=model,
         work_dir="./work_dir",
